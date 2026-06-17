@@ -1,6 +1,7 @@
 #include "ui.h"
 #include "windrose.h"
 #include "i18n.h"
+#include "weather_net.h"
 #include <exec/types.h>
 #include <graphics/gfx.h>
 #include <graphics/rastport.h>
@@ -713,10 +714,12 @@ void W13_ShowLocation(W13App *app)
                 done = 1;
             } else if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) {
                 if (inside(mx, my, 32, 66, 96, 82)) {
-                    SetAPen(win->RPort, 0);
-                    RectFill(win->RPort, 10, 48, 288, 60);
-                    SetAPen(win->RPort, 1);
-                    draw_text(win->RPort, 12, 56, "Search noted; HTTP lookup comes next.");
+                    if (loc_buf[0]) {
+                        copy_config_text(app->config.location, sizeof(app->config.location), loc_buf);
+                        W13_SetStatus(app, "Searching...");
+                        W13_FetchWeatherForLocation(loc_buf, &app->data, app->status, sizeof(app->status));
+                        W13_SetStatus(app, app->status[0] ? app->status : "Search failed");
+                    }
                 } else if (inside(mx, my, 116, 66, 170, 82)) {
                     if (loc_buf[0]) {
                         copy_config_text(app->config.location, sizeof(app->config.location), loc_buf);
@@ -762,6 +765,21 @@ int W13_HandleMenu(W13App *app, UWORD code)
         W13_ShowLocation(app);
     }
     return 0;
+}
+
+
+void W13_SetStatus(W13App *app, const char *status)
+{
+    int i = 0;
+    if (!app)
+        return;
+    while (status && status[i] && i < (int)sizeof(app->status) - 1) {
+        app->status[i] = status[i];
+        ++i;
+    }
+    app->status[i] = 0;
+    if (app->win)
+        W13_DrawAll(app);
 }
 
 void W13_DrawAll(W13App *app)
@@ -850,7 +868,9 @@ void W13_DrawAll(W13App *app)
     cat_text(line, sizeof(line), W13_Text(W13_TX_UPDATE));
     cat_text(line, sizeof(line), "    Q ");
     cat_text(line, sizeof(line), W13_Text(W13_TX_END));
-    cat_text(line, sizeof(line), "    ");
-    cat_text(line, sizeof(line), W13_Text(W13_TX_DEMO_DATA));
+    if (app->status[0]) {
+        cat_text(line, sizeof(line), "    ");
+        cat_text(line, sizeof(line), app->status);
+    }
     draw_text(rp, 8, h - 8, line);
 }

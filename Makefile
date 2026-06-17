@@ -6,12 +6,13 @@ TARGET := $(BUILD_DIR)/Weather13
 OBJS := \
 	$(BUILD_DIR)/weather13.o \
 	$(BUILD_DIR)/weather_data.o \
+	$(BUILD_DIR)/weather_net.o \
 	$(BUILD_DIR)/i18n.o \
 	$(BUILD_DIR)/ui.o \
 	$(BUILD_DIR)/windrose.o \
 	$(BUILD_DIR)/weather_icons.o
 
-CPPFLAGS += -I. -Isrc -DAMITCP13_OS13
+CPPFLAGS += -I. -Isrc -Iinclude -DAMITCP13_OS13
 
 all: $(TARGET)
 

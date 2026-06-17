@@ -7,6 +7,7 @@
 #include <string.h>
 #include "ui.h"
 #include "i18n.h"
+#include "weather_net.h"
 
 struct IntuitionBase *IntuitionBase;
 struct GfxBase *GfxBase;
@@ -72,6 +73,7 @@ int main(void)
     W13_InitLanguage();
     W13_LoadConfig(&app.config);
     W13_FillDummyWeather(&app.data);
+    copy_text(app.status, sizeof(app.status), "Demo data");
     if (app.config.location[0])
         copy_text(app.data.location, sizeof(app.data.location), app.config.location);
     if (!W13_Open(&app)) {
@@ -108,6 +110,7 @@ int main(void)
                     done = 1;
                 } else if (is_update_key(code)) {
                     W13_FillDummyWeather(&app.data);
+    copy_text(app.status, sizeof(app.status), "Demo data");
                     W13_DrawAll(&app);
                 }
             }

@@ -11,11 +11,12 @@ Current status:
 - Selects 2/3/4 bitplane weather icons from the current Workbench depth.
 - Draws the current weather icon, temperature with apparent temperature in brackets, humidity, pressure, location, wind rose and a three-day forecast.
 - Provides classic OS1.3 Intuition menus: `Project -> Info`, `Project -> Quit`, and `Settings -> Location...`.
-- The Location window stores the selected place name locally; the Open-Meteo geocoding endpoint to connect next is `geocoding-api.open-meteo.com/v1/search?name=...`.
+- The Location window can search/set a place through Open-Meteo geocoding and then fetch current weather plus a three-day forecast.
+- Press `U` to refresh online weather for the configured location via `bsdsocket.library`.
 - The window is dynamically resizable and the content follows the available width and height.
 - Daily forecast columns also show maximum rain probability, dominant wind direction, and maximum wind speed.
-- Uses dummy weather data for the first graphics milestone.
-- Network/API support is intentionally not implemented yet.
+- Uses Open-Meteo over plain HTTP; no API key is required.
+- Falls back to dummy weather data until an online update succeeds.
 
 Build:
 

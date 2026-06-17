@@ -18,6 +18,7 @@ typedef struct W13App {
     UWORD screen_depth;
     UWORD asset_depth;
     W13WindowConfig config;
+    char status[64];
 } W13App;
 
 void W13_LoadConfig(W13WindowConfig *cfg);
@@ -25,6 +26,7 @@ void W13_SaveConfig(const W13WindowConfig *cfg);
 int W13_Open(W13App *app);
 void W13_Close(W13App *app);
 void W13_DrawAll(W13App *app);
+void W13_SetStatus(W13App *app, const char *status);
 int W13_HandleMenu(W13App *app, UWORD code);
 void W13_ShowInfo(W13App *app);
 void W13_ShowLocation(W13App *app);
