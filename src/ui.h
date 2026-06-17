@@ -32,6 +32,7 @@ int W13_Open(W13App *app);
 void W13_Close(W13App *app);
 void W13_DrawAll(W13App *app);
 void W13_SetStatus(W13App *app, const char *status);
+void W13_DrawWindRoseOnly(W13App *app);
 int W13_HandleMenu(W13App *app, UWORD code);
 void W13_ShowInfo(W13App *app);
 void W13_ShowLocation(W13App *app);

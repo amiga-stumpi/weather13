@@ -62,8 +62,9 @@ static int is_update_key(UWORD code)
 static void update_wind_jitter(W13App *app)
 {
     static const WORD offsets[][2] = {
-        { 0, 0 }, { 1, 0 }, { 2, 1 }, { 1, 0 },
-        { 0, 0 }, { -1, 0 }, { -2, -1 }, { -1, 0 }
+        { 0, 0 }, { 2, 1 }, { 4, 2 }, { 6, 3 },
+        { 4, 1 }, { 2, 0 }, { 0, 0 }, { -2, -1 },
+        { -4, -2 }, { -6, -3 }, { -4, -1 }, { -2, 0 }
     };
     UWORD count = (UWORD)(sizeof(offsets) / sizeof(offsets[0]));
 
@@ -127,7 +128,7 @@ int main(void)
                 ++app.anim_ticks;
                 if (app.anim_ticks >= app.anim_next) {
                     update_wind_jitter(&app);
-                    W13_DrawAll(&app);
+                    W13_DrawWindRoseOnly(&app);
                 }
             } else if (cls == IDCMP_RAWKEY) {
                 if (is_quit_key(code)) {

@@ -782,6 +782,43 @@ void W13_SetStatus(W13App *app, const char *status)
         W13_DrawAll(app);
 }
 
+
+static WORD wind_area_x(W13App *app)
+{
+    WORD w;
+    WORD wind_x;
+    if (!app || !app->win)
+        return 300;
+    w = app->win->Width;
+    if (w < W13_MIN_W)
+        w = W13_MIN_W;
+    wind_x = (WORD)(w - 174);
+    if (wind_x < 300)
+        wind_x = 300;
+    return wind_x;
+}
+
+void W13_DrawWindRoseOnly(W13App *app)
+{
+    struct RastPort *rp;
+    WORD wind_x;
+    WORD cx;
+    WORD cy = 72;
+    WORD radius = 26;
+
+    if (!app || !app->win)
+        return;
+    rp = app->win->RPort;
+    wind_x = wind_area_x(app);
+    cx = (WORD)(wind_x + 86);
+    SetAPen(rp, 0);
+    RectFill(rp, cx - radius - 14, cy - radius - 8, cx + radius + 16, cy + radius + 14);
+    SetBPen(rp, 0);
+    SetDrMd(rp, JAM1);
+    W13_DrawWindRose(rp, cx, cy, radius, app->data.wind_dir_deg, app->data.wind_speed,
+        app->wind_jitter_x, app->wind_jitter_y, 1);
+}
+
 void W13_DrawAll(W13App *app)
 {
     struct RastPort *rp;
@@ -859,7 +896,7 @@ void W13_DrawAll(W13App *app)
     cat_text(line, sizeof(line), " km/h ");
     cat_text(line, sizeof(line), W13_WindDirName(app->data.wind_dir_deg));
     draw_text(rp, wind_x - 5, 53, line);
-    W13_DrawWindRose(rp, wind_x + 86, 72, 26, app->data.wind_dir_deg, app->data.wind_speed, app->wind_jitter_x, app->wind_jitter_y, 1);
+    W13_DrawWindRoseOnly(app);
 
     draw_forecast(app, 8, forecast_y - 2, (WORD)(w - 18));
 
