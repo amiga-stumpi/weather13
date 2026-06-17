@@ -19,7 +19,10 @@
 #define W13_DEFAULT_W 600
 #define W13_DEFAULT_H 190
 #define W13_CONFIG_FILE "weather13.conf"
-#define W13_CONFIG_BUF_SIZE 160
+#define W13_CONFIG_BUF_SIZE 192
+#define W13_DEFAULT_UPDATE_MINUTES 30
+#define W13_MIN_UPDATE_MINUTES 5
+#define W13_MAX_UPDATE_MINUTES 120
 
 static int text_len(const char *s)
 {
@@ -67,6 +70,7 @@ static void config_defaults(W13WindowConfig *cfg)
     cfg->top = 20;
     cfg->width = W13_DEFAULT_W;
     cfg->height = W13_DEFAULT_H;
+    cfg->update_interval = W13_DEFAULT_UPDATE_MINUTES;
     cfg->location[0] = 'M';
     cfg->location[1] = 'u';
     cfg->location[2] = 'e';
@@ -122,6 +126,8 @@ static void config_set_value(W13WindowConfig *cfg, const char *line)
         cfg->width = (WORD)n;
     else if (key_equals(line, "HEIGHT") && value_in_range(n, W13_MIN_H, 256))
         cfg->height = (WORD)n;
+    else if (key_equals(line, "UPDATE_INTERVAL") && value_in_range(n, W13_MIN_UPDATE_MINUTES, W13_MAX_UPDATE_MINUTES))
+        cfg->update_interval = (WORD)n;
 }
 
 void W13_LoadConfig(W13WindowConfig *cfg)
@@ -173,6 +179,8 @@ void W13_LoadConfig(W13WindowConfig *cfg)
         cfg->left = 0;
     if (cfg->top < 0 || cfg->top > 255 || cfg->top + W13_MIN_H > 256)
         cfg->top = 0;
+    if (cfg->update_interval < W13_MIN_UPDATE_MINUTES || cfg->update_interval > W13_MAX_UPDATE_MINUTES)
+        cfg->update_interval = W13_DEFAULT_UPDATE_MINUTES;
 }
 
 static void config_write_num(BPTR fh, const char *key, long value)
@@ -239,6 +247,7 @@ void W13_SaveConfig(const W13WindowConfig *cfg)
     config_write_num(fh, "TOP", cfg->top);
     config_write_num(fh, "WIDTH", cfg->width);
     config_write_num(fh, "HEIGHT", cfg->height);
+    config_write_num(fh, "UPDATE_INTERVAL", cfg->update_interval);
     config_write_text(fh, "LOCATION", cfg->location);
     Close(fh);
 }
@@ -430,9 +439,10 @@ static void draw_temp_large(struct RastPort *rp, WORD x, WORD y, const char *s)
 static struct IntuiText w13_info_text = { 0, 1, JAM2, 2, 1, 0, (UBYTE *)"Info", 0 };
 static struct IntuiText w13_quit_text = { 0, 1, JAM2, 2, 1, 0, (UBYTE *)"Quit", 0 };
 static struct IntuiText w13_location_text = { 0, 1, JAM2, 2, 1, 0, (UBYTE *)"Location...", 0 };
+static struct IntuiText w13_update_interval_text = { 0, 1, JAM2, 2, 1, 0, (UBYTE *)"Update Interval...", 0 };
 
 static struct MenuItem w13_project_items[2];
-static struct MenuItem w13_settings_items[1];
+static struct MenuItem w13_settings_items[2];
 static struct Menu w13_menus[2];
 
 static void init_menu_item(struct MenuItem *item, struct MenuItem *next, WORD top, WORD width, struct IntuiText *text)
@@ -453,7 +463,8 @@ static void setup_menus(W13App *app)
         return;
     init_menu_item(&w13_project_items[0], &w13_project_items[1], 0, 64, &w13_info_text);
     init_menu_item(&w13_project_items[1], 0, 11, 64, &w13_quit_text);
-    init_menu_item(&w13_settings_items[0], 0, 0, 92, &w13_location_text);
+    init_menu_item(&w13_settings_items[0], &w13_settings_items[1], 0, 128, &w13_location_text);
+    init_menu_item(&w13_settings_items[1], 0, 11, 128, &w13_update_interval_text);
 
     memset(w13_menus, 0, sizeof(w13_menus));
     w13_menus[0].NextMenu = &w13_menus[1];
@@ -467,7 +478,7 @@ static void setup_menus(W13App *app)
 
     w13_menus[1].LeftEdge = 72;
     w13_menus[1].TopEdge = 0;
-    w13_menus[1].Width = 80;
+    w13_menus[1].Width = 88;
     w13_menus[1].Height = 10;
     w13_menus[1].Flags = MENUENABLED;
     w13_menus[1].MenuName = (UBYTE *)"Settings";
@@ -750,6 +761,123 @@ void W13_ShowLocation(W13App *app)
     CloseWindow(win);
 }
 
+
+void W13_ShowUpdateInterval(W13App *app)
+{
+    struct NewWindow nw;
+    struct Window *win;
+    struct Gadget interval_gadget;
+    struct StringInfo interval_info;
+    static char interval_buf[4];
+    static char interval_undo[4];
+    ULONG mask;
+    int done = 0;
+    WORD left = 28;
+    WORD top = 28;
+
+    if (!app)
+        return;
+    interval_buf[0] = 0;
+    cat_num(interval_buf, sizeof(interval_buf), app->config.update_interval);
+    interval_undo[0] = 0;
+    memset(&interval_info, 0, sizeof(interval_info));
+    interval_info.Buffer = (UBYTE *)interval_buf;
+    interval_info.UndoBuffer = (UBYTE *)interval_undo;
+    interval_info.MaxChars = sizeof(interval_buf);
+    memset(&interval_gadget, 0, sizeof(interval_gadget));
+    interval_gadget.LeftEdge = 128;
+    interval_gadget.TopEdge = 28;
+    interval_gadget.Width = 48;
+    interval_gadget.Height = 12;
+    interval_gadget.Flags = GADGHCOMP;
+    interval_gadget.Activation = RELVERIFY;
+    interval_gadget.GadgetType = STRGADGET;
+    interval_gadget.SpecialInfo = (APTR)&interval_info;
+    interval_gadget.GadgetID = 1;
+
+    if (app->win) {
+        left = app->win->LeftEdge + 28;
+        top = app->win->TopEdge + 28;
+    }
+    memset(&nw, 0, sizeof(nw));
+    nw.LeftEdge = left;
+    nw.TopEdge = top;
+    nw.Width = 280;
+    nw.Height = 94;
+    nw.DetailPen = 0;
+    nw.BlockPen = 1;
+    nw.IDCMPFlags = IDCMP_CLOSEWINDOW | IDCMP_MOUSEBUTTONS | IDCMP_GADGETUP | IDCMP_RAWKEY;
+    nw.Flags = WFLG_DRAGBAR | WFLG_DEPTHGADGET | WFLG_CLOSEGADGET | WFLG_SMART_REFRESH | WFLG_ACTIVATE;
+    nw.FirstGadget = &interval_gadget;
+    nw.Title = (UBYTE *)"Update Interval";
+    nw.Type = WBENCHSCREEN;
+    win = OpenWindow(&nw);
+    if (!win)
+        return;
+    SetDrMd(win->RPort, JAM1);
+    SetBPen(win->RPort, 0);
+    SetAPen(win->RPort, 0);
+    RectFill(win->RPort, 2, 10, win->Width - 3, win->Height - 3);
+    SetAPen(win->RPort, 1);
+    draw_text(win->RPort, 12, 38, "Minutes:");
+    draw_box(win->RPort, 126, 26, 178, 42, 1);
+    draw_text(win->RPort, 12, 56, "Valid range: 5..120 minutes");
+    draw_button(win->RPort, 82, 68, 134, 84, "Set");
+    draw_button(win->RPort, 154, 68, 222, 84, "Cancel");
+    ActivateGadget(&interval_gadget, win, 0);
+    mask = 1UL << win->UserPort->mp_SigBit;
+    while (!done) {
+        struct IntuiMessage *msg;
+        Wait(mask);
+        while ((msg = (struct IntuiMessage *)GetMsg(win->UserPort)) != 0) {
+            ULONG cls = msg->Class;
+            WORD mx = msg->MouseX;
+            WORD my = msg->MouseY;
+            UWORD code = msg->Code;
+            ReplyMsg((struct Message *)msg);
+            if (cls == IDCMP_CLOSEWINDOW) {
+                done = 1;
+            } else if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) {
+                if (inside(mx, my, 82, 68, 134, 84)) {
+                    long value = parse_long_value(interval_buf);
+                    if (value_in_range(value, W13_MIN_UPDATE_MINUTES, W13_MAX_UPDATE_MINUTES)) {
+                        app->config.update_interval = (WORD)value;
+                        app->update_ticks = 0;
+                        W13_SetStatus(app, "Update interval changed");
+                        done = 1;
+                    } else {
+                        SetAPen(win->RPort, 0);
+                        RectFill(win->RPort, 10, 46, 268, 60);
+                        SetAPen(win->RPort, 1);
+                        draw_text(win->RPort, 12, 56, "Valid range: 5..120 minutes");
+                    }
+                } else if (inside(mx, my, 154, 68, 222, 84)) {
+                    done = 1;
+                }
+            } else if (cls == IDCMP_RAWKEY) {
+                UWORD raw = code & 0x7f;
+                if (raw == 0x44) {
+                    long value = parse_long_value(interval_buf);
+                    if (value_in_range(value, W13_MIN_UPDATE_MINUTES, W13_MAX_UPDATE_MINUTES)) {
+                        app->config.update_interval = (WORD)value;
+                        app->update_ticks = 0;
+                        W13_SetStatus(app, "Update interval changed");
+                        done = 1;
+                    } else {
+                        SetAPen(win->RPort, 0);
+                        RectFill(win->RPort, 10, 46, 268, 60);
+                        SetAPen(win->RPort, 1);
+                        draw_text(win->RPort, 12, 56, "Valid range: 5..120 minutes");
+                    }
+                } else if (raw == 0x45) {
+                    done = 1;
+                }
+            }
+        }
+    }
+    CloseWindow(win);
+}
+
 int W13_HandleMenu(W13App *app, UWORD code)
 {
     UWORD menu = MENUNUM(code);
@@ -763,6 +891,8 @@ int W13_HandleMenu(W13App *app, UWORD code)
         return 1;
     } else if (menu == 1 && item == 0) {
         W13_ShowLocation(app);
+    } else if (menu == 1 && item == 1) {
+        W13_ShowUpdateInterval(app);
     }
     return 0;
 }

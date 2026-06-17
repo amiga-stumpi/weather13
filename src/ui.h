@@ -9,6 +9,7 @@ typedef struct W13WindowConfig {
     WORD top;
     WORD width;
     WORD height;
+    WORD update_interval;
     char location[32];
 } W13WindowConfig;
 
@@ -24,6 +25,7 @@ typedef struct W13App {
     UWORD anim_ticks;
     UWORD anim_next;
     UWORD anim_phase;
+    ULONG update_ticks;
 } W13App;
 
 void W13_LoadConfig(W13WindowConfig *cfg);
@@ -36,5 +38,6 @@ void W13_DrawWindRoseOnly(W13App *app);
 int W13_HandleMenu(W13App *app, UWORD code);
 void W13_ShowInfo(W13App *app);
 void W13_ShowLocation(W13App *app);
+void W13_ShowUpdateInterval(W13App *app);
 
 #endif

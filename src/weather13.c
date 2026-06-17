@@ -59,6 +59,38 @@ static int is_update_key(UWORD code)
     return code == 0x16; /* U on Amiga raw keyboard */
 }
 
+
+static ULONG update_interval_ticks(const W13App *app)
+{
+    WORD minutes = 30;
+    if (app)
+        minutes = app->config.update_interval;
+    if (minutes < 5)
+        minutes = 5;
+    else if (minutes > 120)
+        minutes = 120;
+    return (ULONG)minutes * 60UL * 10UL;
+}
+
+static void refresh_weather(W13App *app, int startup_cache_loaded)
+{
+    if (!app)
+        return;
+    W13_SetStatus(app, "Updating...");
+    if (!W13_FetchWeatherForLocation(app->config.location[0] ? app->config.location : app->data.location, &app->data, app->status, sizeof(app->status))) {
+        if (startup_cache_loaded < 0)
+            W13_SetStatus(app, app->status[0] ? app->status : "Update failed");
+        else if (startup_cache_loaded)
+            W13_SetStatus(app, "Offline; using cache");
+        else
+            W13_SetStatus(app, "Offline; demo data");
+    } else {
+        W13_SetStatus(app, app->status);
+    }
+    app->update_ticks = 0;
+    W13_DrawAll(app);
+}
+
 static void update_wind_jitter(W13App *app)
 {
     static const WORD offsets[][2] = {
@@ -105,16 +137,7 @@ int main(void)
     }
     app.anim_next = 30;
     W13_DrawAll(&app);
-    W13_SetStatus(&app, "Updating...");
-    if (!W13_FetchWeatherForLocation(app.config.location[0] ? app.config.location : app.data.location, &app.data, app.status, sizeof(app.status))) {
-        if (cache_loaded)
-            W13_SetStatus(&app, "Offline; using cache");
-        else
-            W13_SetStatus(&app, "Offline; demo data");
-    } else {
-        W13_SetStatus(&app, app.status);
-    }
-    W13_DrawAll(&app);
+    refresh_weather(&app, cache_loaded);
     sigmask = 1UL << app.win->UserPort->mp_SigBit;
 
     while (!done) {
@@ -141,20 +164,18 @@ int main(void)
                 EndRefresh(app.win, TRUE);
             } else if (cls == IDCMP_INTUITICKS) {
                 ++app.anim_ticks;
+                ++app.update_ticks;
                 if (app.anim_ticks >= app.anim_next) {
                     update_wind_jitter(&app);
                     W13_DrawWindRoseOnly(&app);
                 }
+                if (app.update_ticks >= update_interval_ticks(&app))
+                    refresh_weather(&app, -1);
             } else if (cls == IDCMP_RAWKEY) {
                 if (is_quit_key(code)) {
                     done = 1;
                 } else if (is_update_key(code)) {
-                    W13_SetStatus(&app, "Updating...");
-                    if (!W13_FetchWeatherForLocation(app.config.location[0] ? app.config.location : app.data.location, &app.data, app.status, sizeof(app.status)))
-                        W13_SetStatus(&app, app.status[0] ? app.status : "Update failed");
-                    else
-                        W13_SetStatus(&app, app.status);
-                    W13_DrawAll(&app);
+                    refresh_weather(&app, -1);
                 }
             }
         }
