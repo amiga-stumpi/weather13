@@ -32,6 +32,27 @@ static int text_len(const char *s)
     return n;
 }
 
+static int lower_char(int c)
+{
+    if (c >= 'A' && c <= 'Z')
+        return c + ('a' - 'A');
+    return c;
+}
+
+static int text_equals_ci(const char *a, const char *b)
+{
+    int i = 0;
+    if (!a || !b)
+        return 0;
+    while (a[i] && b[i]) {
+        if (lower_char((UBYTE)a[i]) != lower_char((UBYTE)b[i]))
+            return 0;
+        ++i;
+    }
+    return a[i] == 0 && b[i] == 0;
+}
+
+
 static int value_in_range(long value, long min_value, long max_value)
 {
     return value >= min_value && value <= max_value;
@@ -589,6 +610,20 @@ static void draw_button(struct RastPort *rp, WORD x1, WORD y1, WORD x2, WORD y2,
     draw_text(rp, (WORD)(x1 + 8), (WORD)(y1 + 12), label);
 }
 
+static void draw_location_result(struct Window *win, const char *line1, const char *line2)
+{
+    if (!win)
+        return;
+    SetAPen(win->RPort, 0);
+    RectFill(win->RPort, 10, 46, win->Width - 12, 72);
+    SetAPen(win->RPort, 1);
+    if (line1 && line1[0])
+        draw_text(win->RPort, 12, 56, line1);
+    if (line2 && line2[0])
+        draw_text(win->RPort, 12, 68, line2);
+}
+
+
 void W13_ShowInfo(W13App *app)
 {
     struct NewWindow nw;
@@ -657,6 +692,9 @@ void W13_ShowLocation(W13App *app)
     struct StringInfo loc_info;
     static char loc_buf[32];
     static char loc_undo[32];
+    char found_names[3][32];
+    char result1[48];
+    char result2[80];
     ULONG mask;
     int done = 0;
     WORD left = 24;
@@ -687,8 +725,8 @@ void W13_ShowLocation(W13App *app)
     memset(&nw, 0, sizeof(nw));
     nw.LeftEdge = left;
     nw.TopEdge = top;
-    nw.Width = 300;
-    nw.Height = 92;
+    nw.Width = 340;
+    nw.Height = 110;
     nw.DetailPen = 0;
     nw.BlockPen = 1;
     nw.IDCMPFlags = IDCMP_CLOSEWINDOW | IDCMP_MOUSEBUTTONS | IDCMP_GADGETUP | IDCMP_RAWKEY;
@@ -706,10 +744,10 @@ void W13_ShowLocation(W13App *app)
     SetAPen(win->RPort, 1);
     draw_text(win->RPort, 12, 38, "Ort:");
     draw_box(win->RPort, 66, 26, 250, 42, 1);
-    draw_text(win->RPort, 12, 56, "Open-Meteo search: /v1/search?name=");
-    draw_button(win->RPort, 32, 66, 96, 82, "Search");
-    draw_button(win->RPort, 116, 66, 170, 82, "Set");
-    draw_button(win->RPort, 190, 66, 256, 82, "Cancel");
+    draw_location_result(win, "Enter a location and press Search", 0);
+    draw_button(win->RPort, 32, 84, 96, 100, "Search");
+    draw_button(win->RPort, 116, 84, 170, 100, "Set");
+    draw_button(win->RPort, 190, 84, 256, 100, "Cancel");
     ActivateGadget(&loc_gadget, win, 0);
     mask = 1UL << win->UserPort->mp_SigBit;
     while (!done) {
@@ -724,14 +762,34 @@ void W13_ShowLocation(W13App *app)
             if (cls == IDCMP_CLOSEWINDOW) {
                 done = 1;
             } else if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) {
-                if (inside(mx, my, 32, 66, 96, 82)) {
+                if (inside(mx, my, 32, 84, 96, 100)) {
                     if (loc_buf[0]) {
-                        copy_config_text(app->config.location, sizeof(app->config.location), loc_buf);
+                        int count;
                         W13_SetStatus(app, "Searching...");
-                        W13_FetchWeatherForLocation(loc_buf, &app->data, app->status, sizeof(app->status));
-                        W13_SetStatus(app, app->status[0] ? app->status : "Search failed");
+                        count = W13_SearchLocations(loc_buf, found_names, 3, app->status, sizeof(app->status));
+                        if (count <= 0) {
+                            draw_location_result(win, "Location not found", 0);
+                            W13_SetStatus(app, app->status[0] ? app->status : "Search failed");
+                        } else if (text_equals_ci(loc_buf, found_names[0])) {
+                            result1[0] = 0;
+                            cat_text(result1, sizeof(result1), "Found: ");
+                            cat_text(result1, sizeof(result1), found_names[0]);
+                            draw_location_result(win, result1, 0);
+                            copy_config_text(app->config.location, sizeof(app->config.location), found_names[0]);
+                            W13_FetchWeatherForLocation(found_names[0], &app->data, app->status, sizeof(app->status));
+                            W13_SetStatus(app, app->status[0] ? app->status : "Search done");
+                        } else {
+                            result2[0] = 0;
+                            cat_text(result2, sizeof(result2), found_names[0]);
+                            if (count > 1) {
+                                cat_text(result2, sizeof(result2), ", ");
+                                cat_text(result2, sizeof(result2), found_names[1]);
+                            }
+                            draw_location_result(win, "Location not found. Try:", result2);
+                            W13_SetStatus(app, "Similar locations found");
+                        }
                     }
-                } else if (inside(mx, my, 116, 66, 170, 82)) {
+                } else if (inside(mx, my, 116, 84, 170, 100)) {
                     if (loc_buf[0]) {
                         copy_config_text(app->config.location, sizeof(app->config.location), loc_buf);
                         copy_config_text(app->data.location, sizeof(app->data.location), loc_buf);
@@ -739,7 +797,7 @@ void W13_ShowLocation(W13App *app)
                             W13_DrawAll(app);
                     }
                     done = 1;
-                } else if (inside(mx, my, 190, 66, 256, 82)) {
+                } else if (inside(mx, my, 190, 84, 256, 100)) {
                     done = 1;
                 }
             } else if (cls == IDCMP_RAWKEY) {

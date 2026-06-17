@@ -419,6 +419,82 @@ static char *json_field(char *start, const char *field)
     return find_text(start, pat);
 }
 
+
+static int lower_char(int c)
+{
+    if (c >= 'A' && c <= 'Z')
+        return c + ('a' - 'A');
+    return c;
+}
+
+static int text_equals_ci(const char *a, const char *b)
+{
+    int i = 0;
+    if (!a || !b)
+        return 0;
+    while (a[i] && b[i]) {
+        if (lower_char((UBYTE)a[i]) != lower_char((UBYTE)b[i]))
+            return 0;
+        ++i;
+    }
+    return a[i] == 0 && b[i] == 0;
+}
+
+static void append_latin1_char(char *dst, int dst_size, UBYTE c)
+{
+    if (c == 0xe4) append_text(dst, dst_size, "ae");
+    else if (c == 0xf6) append_text(dst, dst_size, "oe");
+    else if (c == 0xfc) append_text(dst, dst_size, "ue");
+    else if (c == 0xc4) append_text(dst, dst_size, "Ae");
+    else if (c == 0xd6) append_text(dst, dst_size, "Oe");
+    else if (c == 0xdc) append_text(dst, dst_size, "Ue");
+    else if (c == 0xdf) append_text(dst, dst_size, "ss");
+    else if (c >= 32 && c < 127) append_char(dst, dst_size, (char)c);
+}
+
+static void append_utf8_json_char(char *dst, int dst_size, char **pp)
+{
+    UBYTE c = (UBYTE)**pp;
+    if (c == 0xc3 && (*pp)[1]) {
+        ++(*pp);
+        append_latin1_char(dst, dst_size, (UBYTE)**pp);
+    } else if (c < 128) {
+        append_char(dst, dst_size, (char)c);
+    }
+}
+
+static char *json_string_field(char *start, const char *field, char *dst, int dst_size)
+{
+    char *p = json_field(start, field);
+    if (!p || !dst || dst_size <= 0)
+        return 0;
+    dst[0] = 0;
+    while (*p && *p != ':')
+        ++p;
+    if (*p == ':')
+        ++p;
+    while (*p && *p != '"')
+        ++p;
+    if (*p != '"')
+        return 0;
+    ++p;
+    while (*p && *p != '"') {
+        if (*p == '\\' && p[1]) {
+            ++p;
+            if (*p == 'n' || *p == 'r' || *p == 't') {
+                ;
+            } else {
+                append_char(dst, dst_size, *p);
+            }
+        } else {
+            append_utf8_json_char(dst, dst_size, &p);
+        }
+        ++p;
+    }
+    return *p == '"' ? p + 1 : p;
+}
+
+
 static char *json_object(char *start, const char *field)
 {
     char *p = json_field(start, field);
@@ -499,6 +575,52 @@ static const char *condition_from_code(int code)
     }
 }
 
+
+int W13_SearchLocations(const char *location, char names[][32], int max_names, char *status, int status_size)
+{
+    char enc[96];
+    char path[192];
+    char *p;
+    int r;
+    int count = 0;
+
+    if (!location || !location[0] || !names || max_names <= 0) {
+        set_status(status, status_size, "No location set");
+        return 0;
+    }
+    url_encode_query(location, enc, sizeof(enc));
+    path[0] = 0;
+    append_text(path, sizeof(path), "/v1/search?name=");
+    append_text(path, sizeof(path), enc);
+    append_text(path, sizeof(path), "&count=3&language=de&format=json");
+    set_status(status, status_size, "Searching location...");
+    r = http_fetch(W13_GEO_HOST, path, status, status_size);
+    if (r <= 0)
+        return 0;
+    p = find_text(g_http_buf, "\"results\"");
+    if (!p) {
+        set_status(status, status_size, "Location not found");
+        return 0;
+    }
+    while (count < max_names) {
+        char *next = json_string_field(p, "name", names[count], 32);
+        if (!next || !names[count][0])
+            break;
+        ++count;
+        p = next;
+    }
+    if (count > 0) {
+        if (text_equals_ci(location, names[0]))
+            set_status(status, status_size, "Location found");
+        else
+            set_status(status, status_size, "Similar locations found");
+    } else {
+        set_status(status, status_size, "Location not found");
+    }
+    return count;
+}
+
+
 static int geocode_location(const char *location, long *lat_e6, long *lon_e6, char *name, int name_size, char *status, int status_size)
 {
     char enc[96];
@@ -520,7 +642,8 @@ static int geocode_location(const char *location, long *lat_e6, long *lon_e6, ch
     }
     *lat_e6 = parse_field_scaled(g_http_buf, "latitude", 1000000);
     *lon_e6 = parse_field_scaled(g_http_buf, "longitude", 1000000);
-    copy_text(name, name_size, location);
+    if (!json_string_field(g_http_buf, "name", name, name_size) || !name[0])
+        copy_text(name, name_size, location);
     return 1;
 }
 
