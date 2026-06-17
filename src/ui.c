@@ -803,7 +803,7 @@ void W13_DrawWindRoseOnly(W13App *app)
     struct RastPort *rp;
     WORD wind_x;
     WORD cx;
-    WORD cy = 62;
+    WORD cy = 65;
     WORD radius = 26;
 
     if (!app || !app->win)
@@ -817,6 +817,15 @@ void W13_DrawWindRoseOnly(W13App *app)
     SetDrMd(rp, JAM1);
     W13_DrawWindRose(rp, cx, cy, radius, app->data.wind_dir_deg, app->data.wind_speed,
         app->wind_jitter_x, app->wind_jitter_y, 1);
+    {
+        char line[32];
+        line[0] = 0;
+        cat_num(line, sizeof(line), app->data.wind_speed);
+        cat_text(line, sizeof(line), " km/h ");
+        cat_text(line, sizeof(line), W13_WindDirName(app->data.wind_dir_deg));
+        SetAPen(rp, 1);
+        draw_text(rp, wind_x - 5, 53, line);
+    }
 }
 
 void W13_DrawAll(W13App *app)
