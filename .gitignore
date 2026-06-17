@@ -2,3 +2,4 @@ build/
 *.o
 weather13.conf
 weather13.debug
+weather13.cache

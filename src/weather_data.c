@@ -1,4 +1,6 @@
 #include "weather_data.h"
+#include <proto/dos.h>
+#include <dos/dos.h>
 
 static void copy_text(char *dst, int dst_size, const char *src)
 {
@@ -50,4 +52,55 @@ void W13_FillDummyWeather(WeatherData *data)
     data->forecast[2].precip_probability = 75;
     data->forecast[2].wind_speed_max = 26;
     data->forecast[2].wind_dir_deg = 270;
+}
+
+
+#define W13_CACHE_FILE "weather13.cache"
+#define W13_CACHE_MAGIC 0x57313343UL
+#define W13_CACHE_VERSION 1UL
+
+typedef struct WeatherCacheFile {
+    ULONG magic;
+    ULONG version;
+    WeatherData data;
+} WeatherCacheFile;
+
+int W13_LoadWeatherCache(WeatherData *data)
+{
+    BPTR fh;
+    WeatherCacheFile cache;
+    LONG got;
+
+    if (!data)
+        return 0;
+    fh = Open((STRPTR)W13_CACHE_FILE, MODE_OLDFILE);
+    if (!fh)
+        return 0;
+    got = Read(fh, &cache, sizeof(cache));
+    Close(fh);
+    if (got != (LONG)sizeof(cache))
+        return 0;
+    if (cache.magic != W13_CACHE_MAGIC || cache.version != W13_CACHE_VERSION)
+        return 0;
+    *data = cache.data;
+    return 1;
+}
+
+int W13_SaveWeatherCache(const WeatherData *data)
+{
+    BPTR fh;
+    WeatherCacheFile cache;
+    LONG written;
+
+    if (!data)
+        return 0;
+    cache.magic = W13_CACHE_MAGIC;
+    cache.version = W13_CACHE_VERSION;
+    cache.data = *data;
+    fh = Open((STRPTR)W13_CACHE_FILE, MODE_NEWFILE);
+    if (!fh)
+        return 0;
+    written = Write(fh, &cache, sizeof(cache));
+    Close(fh);
+    return written == (LONG)sizeof(cache);
 }

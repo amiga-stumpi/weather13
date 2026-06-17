@@ -29,5 +29,7 @@ typedef struct WeatherData {
 } WeatherData;
 
 void W13_FillDummyWeather(WeatherData *data);
+int W13_LoadWeatherCache(WeatherData *data);
+int W13_SaveWeatherCache(const WeatherData *data);
 
 #endif

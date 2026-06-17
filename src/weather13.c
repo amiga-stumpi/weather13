@@ -82,6 +82,7 @@ int main(void)
     W13App app;
     ULONG sigmask;
     int done = 0;
+    int cache_loaded = 0;
 
     memset(&app, 0, sizeof(app));
     if (!open_libraries()) {
@@ -92,6 +93,10 @@ int main(void)
     W13_LoadConfig(&app.config);
     W13_FillDummyWeather(&app.data);
     copy_text(app.status, sizeof(app.status), "Demo data");
+    if (W13_LoadWeatherCache(&app.data)) {
+        copy_text(app.status, sizeof(app.status), "Cached data");
+        cache_loaded = 1;
+    }
     if (app.config.location[0])
         copy_text(app.data.location, sizeof(app.data.location), app.config.location);
     if (!W13_Open(&app)) {
@@ -99,6 +104,16 @@ int main(void)
         return 20;
     }
     app.anim_next = 30;
+    W13_DrawAll(&app);
+    W13_SetStatus(&app, "Updating...");
+    if (!W13_FetchWeatherForLocation(app.config.location[0] ? app.config.location : app.data.location, &app.data, app.status, sizeof(app.status))) {
+        if (cache_loaded)
+            W13_SetStatus(&app, "Offline; using cache");
+        else
+            W13_SetStatus(&app, "Offline; demo data");
+    } else {
+        W13_SetStatus(&app, app.status);
+    }
     W13_DrawAll(&app);
     sigmask = 1UL << app.win->UserPort->mp_SigBit;
 
@@ -145,6 +160,7 @@ int main(void)
         }
     }
 
+    W13_SaveWeatherCache(&app.data);
     W13_Close(&app);
     W13_SaveConfig(&app.config);
     close_libraries();
