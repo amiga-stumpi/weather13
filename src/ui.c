@@ -493,11 +493,11 @@ static void draw_temp_large(struct RastPort *rp, WORD x, WORD y, const char *s)
 }
 
 
-static struct IntuiText w13_info_text = { 0, 1, JAM2, 2, 1, 0, (UBYTE *)"Info", 0 };
-static struct IntuiText w13_quit_text = { 0, 1, JAM2, 2, 1, 0, (UBYTE *)"Quit", 0 };
-static struct IntuiText w13_location_text = { 0, 1, JAM2, 2, 1, 0, (UBYTE *)"Location...", 0 };
-static struct IntuiText w13_update_interval_text = { 0, 1, JAM2, 2, 1, 0, (UBYTE *)"Update Interval...", 0 };
-static struct IntuiText w13_language_text = { 0, 1, JAM2, 2, 1, 0, (UBYTE *)"Language...", 0 };
+static struct IntuiText w13_info_text = { 0, 1, JAM2, 2, 1, 0, 0, 0 };
+static struct IntuiText w13_quit_text = { 0, 1, JAM2, 2, 1, 0, 0, 0 };
+static struct IntuiText w13_location_text = { 0, 1, JAM2, 2, 1, 0, 0, 0 };
+static struct IntuiText w13_update_interval_text = { 0, 1, JAM2, 2, 1, 0, 0, 0 };
+static struct IntuiText w13_language_text = { 0, 1, JAM2, 2, 1, 0, 0, 0 };
 
 static struct MenuItem w13_project_items[2];
 static struct MenuItem w13_settings_items[3];
@@ -519,11 +519,16 @@ static void setup_menus(W13App *app)
 {
     if (!app || !app->win)
         return;
-    init_menu_item(&w13_project_items[0], &w13_project_items[1], 0, 64, &w13_info_text);
-    init_menu_item(&w13_project_items[1], 0, 11, 64, &w13_quit_text);
-    init_menu_item(&w13_settings_items[0], &w13_settings_items[1], 0, 128, &w13_location_text);
-    init_menu_item(&w13_settings_items[1], &w13_settings_items[2], 11, 128, &w13_update_interval_text);
-    init_menu_item(&w13_settings_items[2], 0, 22, 128, &w13_language_text);
+    w13_info_text.IText = (UBYTE *)W13_Text(W13_TX_MENU_INFO);
+    w13_quit_text.IText = (UBYTE *)W13_Text(W13_TX_MENU_QUIT);
+    w13_location_text.IText = (UBYTE *)W13_Text(W13_TX_MENU_LOCATION);
+    w13_update_interval_text.IText = (UBYTE *)W13_Text(W13_TX_MENU_UPDATE_INTERVAL);
+    w13_language_text.IText = (UBYTE *)W13_Text(W13_TX_MENU_LANGUAGE);
+    init_menu_item(&w13_project_items[0], &w13_project_items[1], 0, 72, &w13_info_text);
+    init_menu_item(&w13_project_items[1], 0, 11, 72, &w13_quit_text);
+    init_menu_item(&w13_settings_items[0], &w13_settings_items[1], 0, 152, &w13_location_text);
+    init_menu_item(&w13_settings_items[1], &w13_settings_items[2], 11, 152, &w13_update_interval_text);
+    init_menu_item(&w13_settings_items[2], 0, 22, 152, &w13_language_text);
 
     memset(w13_menus, 0, sizeof(w13_menus));
     w13_menus[0].NextMenu = &w13_menus[1];
@@ -532,15 +537,15 @@ static void setup_menus(W13App *app)
     w13_menus[0].Width = 72;
     w13_menus[0].Height = 10;
     w13_menus[0].Flags = MENUENABLED;
-    w13_menus[0].MenuName = (UBYTE *)"Project";
+    w13_menus[0].MenuName = (UBYTE *)W13_Text(W13_TX_MENU_PROJECT);
     w13_menus[0].FirstItem = &w13_project_items[0];
 
     w13_menus[1].LeftEdge = 72;
     w13_menus[1].TopEdge = 0;
-    w13_menus[1].Width = 88;
+    w13_menus[1].Width = 96;
     w13_menus[1].Height = 10;
     w13_menus[1].Flags = MENUENABLED;
-    w13_menus[1].MenuName = (UBYTE *)"Settings";
+    w13_menus[1].MenuName = (UBYTE *)W13_Text(W13_TX_MENU_SETTINGS);
     w13_menus[1].FirstItem = &w13_settings_items[0];
 
     SetMenuStrip(app->win, &w13_menus[0]);
@@ -684,7 +689,7 @@ void W13_ShowInfo(W13App *app)
     nw.BlockPen = 1;
     nw.IDCMPFlags = IDCMP_CLOSEWINDOW | IDCMP_MOUSEBUTTONS | IDCMP_RAWKEY;
     nw.Flags = WFLG_DRAGBAR | WFLG_DEPTHGADGET | WFLG_CLOSEGADGET | WFLG_SMART_REFRESH | WFLG_ACTIVATE;
-    nw.Title = (UBYTE *)"Info";
+    nw.Title = (UBYTE *)W13_Text(W13_TX_TITLE_INFO);
     nw.Type = WBENCHSCREEN;
     win = OpenWindow(&nw);
     if (!win)
@@ -700,7 +705,7 @@ void W13_ShowInfo(W13App *app)
     draw_text(win->RPort, 12, 60, "(c) 2026");
     draw_text(win->RPort, 12, 72, "If you want to buy me a coffe,");
     draw_text(win->RPort, 12, 84, "send me a buck: paypal.me/mytubefree");
-    draw_button(win->RPort, 128, 92, 190, 108, "OK");
+    draw_button(win->RPort, 128, 92, 190, 108, W13_Text(W13_TX_BTN_OK));
     mask = 1UL << win->UserPort->mp_SigBit;
     while (!done) {
         struct IntuiMessage *msg;
@@ -770,7 +775,7 @@ void W13_ShowLocation(W13App *app)
     nw.IDCMPFlags = IDCMP_CLOSEWINDOW | IDCMP_MOUSEBUTTONS | IDCMP_GADGETUP | IDCMP_RAWKEY;
     nw.Flags = WFLG_DRAGBAR | WFLG_DEPTHGADGET | WFLG_CLOSEGADGET | WFLG_SMART_REFRESH | WFLG_ACTIVATE;
     nw.FirstGadget = &loc_gadget;
-    nw.Title = (UBYTE *)"Location";
+    nw.Title = (UBYTE *)W13_Text(W13_TX_TITLE_LOCATION);
     nw.Type = WBENCHSCREEN;
     win = OpenWindow(&nw);
     if (!win)
@@ -780,12 +785,12 @@ void W13_ShowLocation(W13App *app)
     SetAPen(win->RPort, 0);
     RectFill(win->RPort, 2, 10, win->Width - 3, win->Height - 3);
     SetAPen(win->RPort, 1);
-    draw_text(win->RPort, 12, 38, "Ort:");
+    draw_text(win->RPort, 12, 38, W13_Text(W13_TX_LABEL_LOCATION));
     draw_box(win->RPort, 66, 26, 250, 42, 1);
-    draw_location_result(win, "Enter a location and press Search", 0);
-    draw_button(win->RPort, 32, 84, 96, 100, "Search");
-    draw_button(win->RPort, 116, 84, 170, 100, "Set");
-    draw_button(win->RPort, 190, 84, 256, 100, "Cancel");
+    draw_location_result(win, W13_Text(W13_TX_MSG_ENTER_LOCATION), 0);
+    draw_button(win->RPort, 32, 84, 96, 100, W13_Text(W13_TX_BTN_SEARCH));
+    draw_button(win->RPort, 116, 84, 170, 100, W13_Text(W13_TX_BTN_SET));
+    draw_button(win->RPort, 190, 84, 256, 100, W13_Text(W13_TX_BTN_CANCEL));
     ActivateGadget(&loc_gadget, win, 0);
     mask = 1UL << win->UserPort->mp_SigBit;
     while (!done) {
@@ -803,19 +808,19 @@ void W13_ShowLocation(W13App *app)
                 if (inside(mx, my, 32, 84, 96, 100)) {
                     if (loc_buf[0]) {
                         int count;
-                        W13_SetStatus(app, "Searching...");
+                        W13_SetStatus(app, W13_Text(W13_TX_MSG_SEARCHING));
                         count = W13_SearchLocations(loc_buf, found_names, 3, app->status, sizeof(app->status));
                         if (count <= 0) {
-                            draw_location_result(win, "Location not found", 0);
-                            W13_SetStatus(app, app->status[0] ? app->status : "Search failed");
+                            draw_location_result(win, W13_Text(W13_TX_MSG_LOCATION_NOT_FOUND), 0);
+                            W13_SetStatus(app, app->status[0] ? app->status : W13_Text(W13_TX_MSG_SEARCH_FAILED));
                         } else if (text_equals_ci(loc_buf, found_names[0])) {
                             result1[0] = 0;
-                            cat_text(result1, sizeof(result1), "Found: ");
+                            cat_text(result1, sizeof(result1), W13_Text(W13_TX_MSG_FOUND_PREFIX));
                             cat_text(result1, sizeof(result1), found_names[0]);
                             draw_location_result(win, result1, 0);
                             copy_config_text(app->config.location, sizeof(app->config.location), found_names[0]);
                             W13_FetchWeatherForLocation(found_names[0], &app->data, app->status, sizeof(app->status));
-                            W13_SetStatus(app, app->status[0] ? app->status : "Search done");
+                            W13_SetStatus(app, app->status[0] ? app->status : W13_Text(W13_TX_MSG_SEARCH_DONE));
                         } else {
                             result2[0] = 0;
                             cat_text(result2, sizeof(result2), found_names[0]);
@@ -823,8 +828,8 @@ void W13_ShowLocation(W13App *app)
                                 cat_text(result2, sizeof(result2), ", ");
                                 cat_text(result2, sizeof(result2), found_names[1]);
                             }
-                            draw_location_result(win, "Location not found. Try:", result2);
-                            W13_SetStatus(app, "Similar locations found");
+                            draw_location_result(win, W13_Text(W13_TX_MSG_LOCATION_TRY), result2);
+                            W13_SetStatus(app, W13_Text(W13_TX_MSG_SIMILAR_LOCATIONS));
                         }
                     }
                 } else if (inside(mx, my, 116, 84, 170, 100)) {
@@ -905,7 +910,7 @@ void W13_ShowUpdateInterval(W13App *app)
     nw.IDCMPFlags = IDCMP_CLOSEWINDOW | IDCMP_MOUSEBUTTONS | IDCMP_GADGETUP | IDCMP_RAWKEY;
     nw.Flags = WFLG_DRAGBAR | WFLG_DEPTHGADGET | WFLG_CLOSEGADGET | WFLG_SMART_REFRESH | WFLG_ACTIVATE;
     nw.FirstGadget = &interval_gadget;
-    nw.Title = (UBYTE *)"Update Interval";
+    nw.Title = (UBYTE *)W13_Text(W13_TX_TITLE_UPDATE_INTERVAL);
     nw.Type = WBENCHSCREEN;
     win = OpenWindow(&nw);
     if (!win)
@@ -915,11 +920,11 @@ void W13_ShowUpdateInterval(W13App *app)
     SetAPen(win->RPort, 0);
     RectFill(win->RPort, 2, 10, win->Width - 3, win->Height - 3);
     SetAPen(win->RPort, 1);
-    draw_text(win->RPort, 12, 38, "Minutes:");
+    draw_text(win->RPort, 12, 38, W13_Text(W13_TX_LABEL_MINUTES));
     draw_box(win->RPort, 126, 26, 178, 42, 1);
-    draw_text(win->RPort, 12, 56, "Valid range: 5..120 minutes");
-    draw_button(win->RPort, 82, 68, 134, 84, "Set");
-    draw_button(win->RPort, 154, 68, 222, 84, "Cancel");
+    draw_text(win->RPort, 12, 56, W13_Text(W13_TX_MSG_VALID_INTERVAL));
+    draw_button(win->RPort, 82, 68, 134, 84, W13_Text(W13_TX_BTN_SET));
+    draw_button(win->RPort, 154, 68, 222, 84, W13_Text(W13_TX_BTN_CANCEL));
     ActivateGadget(&interval_gadget, win, 0);
     mask = 1UL << win->UserPort->mp_SigBit;
     while (!done) {
@@ -939,13 +944,13 @@ void W13_ShowUpdateInterval(W13App *app)
                     if (value_in_range(value, W13_MIN_UPDATE_MINUTES, W13_MAX_UPDATE_MINUTES)) {
                         app->config.update_interval = (WORD)value;
                         app->update_ticks = 0;
-                        W13_SetStatus(app, "Update interval changed");
+                        W13_SetStatus(app, W13_Text(W13_TX_MSG_INTERVAL_CHANGED));
                         done = 1;
                     } else {
                         SetAPen(win->RPort, 0);
                         RectFill(win->RPort, 10, 46, 268, 60);
                         SetAPen(win->RPort, 1);
-                        draw_text(win->RPort, 12, 56, "Valid range: 5..120 minutes");
+                        draw_text(win->RPort, 12, 56, W13_Text(W13_TX_MSG_VALID_INTERVAL));
                     }
                 } else if (inside(mx, my, 154, 68, 222, 84)) {
                     done = 1;
@@ -957,13 +962,13 @@ void W13_ShowUpdateInterval(W13App *app)
                     if (value_in_range(value, W13_MIN_UPDATE_MINUTES, W13_MAX_UPDATE_MINUTES)) {
                         app->config.update_interval = (WORD)value;
                         app->update_ticks = 0;
-                        W13_SetStatus(app, "Update interval changed");
+                        W13_SetStatus(app, W13_Text(W13_TX_MSG_INTERVAL_CHANGED));
                         done = 1;
                     } else {
                         SetAPen(win->RPort, 0);
                         RectFill(win->RPort, 10, 46, 268, 60);
                         SetAPen(win->RPort, 1);
-                        draw_text(win->RPort, 12, 56, "Valid range: 5..120 minutes");
+                        draw_text(win->RPort, 12, 56, W13_Text(W13_TX_MSG_VALID_INTERVAL));
                     }
                 } else if (raw == 0x45) {
                     done = 1;
@@ -998,7 +1003,7 @@ void W13_ShowLanguage(W13App *app)
     nw.BlockPen = 1;
     nw.IDCMPFlags = IDCMP_CLOSEWINDOW | IDCMP_MOUSEBUTTONS | IDCMP_RAWKEY;
     nw.Flags = WFLG_DRAGBAR | WFLG_DEPTHGADGET | WFLG_CLOSEGADGET | WFLG_SMART_REFRESH | WFLG_ACTIVATE;
-    nw.Title = (UBYTE *)"Language";
+    nw.Title = (UBYTE *)W13_Text(W13_TX_TITLE_LANGUAGE);
     nw.Type = WBENCHSCREEN;
     win = OpenWindow(&nw);
     if (!win)
@@ -1008,16 +1013,16 @@ void W13_ShowLanguage(W13App *app)
     SetAPen(win->RPort, 0);
     RectFill(win->RPort, 2, 10, win->Width - 3, win->Height - 3);
     SetAPen(win->RPort, 1);
-    draw_text(win->RPort, 12, 28, "Select language:");
+    draw_text(win->RPort, 12, 28, W13_Text(W13_TX_MSG_SELECT_LANGUAGE));
     draw_button(win->RPort, 34, 38, 126, 54, "English");
     draw_button(win->RPort, 34, 60, 126, 76, "Deutsch");
     draw_button(win->RPort, 34, 82, 126, 98, "Polski");
     if (app->config.language == W13_LANG_ENGLISH)
-        draw_text(win->RPort, 144, 50, "current");
+        draw_text(win->RPort, 144, 50, W13_Text(W13_TX_MSG_CURRENT));
     else if (app->config.language == W13_LANG_GERMAN)
-        draw_text(win->RPort, 144, 72, "current");
+        draw_text(win->RPort, 144, 72, W13_Text(W13_TX_MSG_CURRENT));
     else if (app->config.language == W13_LANG_POLISH)
-        draw_text(win->RPort, 144, 94, "current");
+        draw_text(win->RPort, 144, 94, W13_Text(W13_TX_MSG_CURRENT));
     mask = 1UL << win->UserPort->mp_SigBit;
     while (!done) {
         struct IntuiMessage *msg;
@@ -1034,17 +1039,29 @@ void W13_ShowLanguage(W13App *app)
                 if (inside(mx, my, 34, 38, 126, 54)) {
                     app->config.language = W13_LANG_ENGLISH;
                     W13_SetLanguage(app->config.language);
-                    W13_SetStatus(app, "Language changed");
+                    if (app->win) {
+                        ClearMenuStrip(app->win);
+                        setup_menus(app);
+                    }
+                    W13_SetStatus(app, W13_Text(W13_TX_MSG_LANGUAGE_CHANGED));
                     done = 1;
                 } else if (inside(mx, my, 34, 60, 126, 76)) {
                     app->config.language = W13_LANG_GERMAN;
                     W13_SetLanguage(app->config.language);
-                    W13_SetStatus(app, "Sprache geaendert");
+                    if (app->win) {
+                        ClearMenuStrip(app->win);
+                        setup_menus(app);
+                    }
+                    W13_SetStatus(app, W13_Text(W13_TX_MSG_LANGUAGE_CHANGED));
                     done = 1;
                 } else if (inside(mx, my, 34, 82, 126, 98)) {
                     app->config.language = W13_LANG_POLISH;
                     W13_SetLanguage(app->config.language);
-                    W13_SetStatus(app, "Jezyk zmieniony");
+                    if (app->win) {
+                        ClearMenuStrip(app->win);
+                        setup_menus(app);
+                    }
+                    W13_SetStatus(app, W13_Text(W13_TX_MSG_LANGUAGE_CHANGED));
                     done = 1;
                 }
             } else if (cls == IDCMP_RAWKEY && ((code & 0x7f) == 0x45)) {
