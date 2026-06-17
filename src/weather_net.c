@@ -113,9 +113,25 @@ static void append_coord(char *dst, int dst_size, long e6)
     append_int(dst, dst_size, frac);
 }
 
-static void url_encode_query(const char *src, char *dst, int dst_size)
+
+static void append_pct_byte(char *dst, int dst_size, int *j, UBYTE c)
 {
     static const char hex[] = "0123456789ABCDEF";
+    if (*j + 3 < dst_size) {
+        dst[(*j)++] = '%';
+        dst[(*j)++] = hex[(c >> 4) & 0x0f];
+        dst[(*j)++] = hex[c & 0x0f];
+    }
+}
+
+static void append_utf8_pct_latin1(char *dst, int dst_size, int *j, UBYTE c)
+{
+    append_pct_byte(dst, dst_size, j, (UBYTE)(0xc0 | (c >> 6)));
+    append_pct_byte(dst, dst_size, j, (UBYTE)(0x80 | (c & 0x3f)));
+}
+
+static void url_encode_query(const char *src, char *dst, int dst_size)
+{
     int i = 0;
     int j = 0;
     UBYTE c;
@@ -127,10 +143,10 @@ static void url_encode_query(const char *src, char *dst, int dst_size)
             dst[j++] = (char)c;
         } else if (c == ' ') {
             dst[j++] = '+';
-        } else if (j + 3 < dst_size) {
-            dst[j++] = '%';
-            dst[j++] = hex[(c >> 4) & 0x0f];
-            dst[j++] = hex[c & 0x0f];
+        } else if (c == 0xe4 || c == 0xf6 || c == 0xfc || c == 0xc4 || c == 0xd6 || c == 0xdc || c == 0xdf) {
+            append_utf8_pct_latin1(dst, dst_size, &j, c);
+        } else {
+            append_pct_byte(dst, dst_size, &j, c);
         }
     }
     dst[j] = 0;
@@ -601,7 +617,56 @@ static const char *condition_from_code(int code)
 }
 
 
-int W13_SearchLocations(const char *location, char names[][32], int max_names, char *status, int status_size)
+
+static int make_german_search_variant(const char *src, char *dst, int dst_size)
+{
+    int i = 0;
+    int j = 0;
+    int changed = 0;
+    UBYTE c;
+
+    if (!dst || dst_size <= 0)
+        return 0;
+    while (src && src[i] && j < dst_size - 1) {
+        c = (UBYTE)src[i];
+        if ((c == 'A' || c == 'O' || c == 'U' || c == 'a' || c == 'o' || c == 'u') &&
+            (src[i + 1] == 'e' || src[i + 1] == 'E')) {
+            dst[j++] = (char)c;
+            i += 2;
+            changed = 1;
+        } else if (c == 0xe4) {
+            dst[j++] = 'a';
+            ++i;
+            changed = 1;
+        } else if (c == 0xf6) {
+            dst[j++] = 'o';
+            ++i;
+            changed = 1;
+        } else if (c == 0xfc) {
+            dst[j++] = 'u';
+            ++i;
+            changed = 1;
+        } else if (c == 0xc4) {
+            dst[j++] = 'A';
+            ++i;
+            changed = 1;
+        } else if (c == 0xd6) {
+            dst[j++] = 'O';
+            ++i;
+            changed = 1;
+        } else if (c == 0xdc) {
+            dst[j++] = 'U';
+            ++i;
+            changed = 1;
+        } else {
+            dst[j++] = src[i++];
+        }
+    }
+    dst[j] = 0;
+    return changed && dst[0];
+}
+
+static int search_locations_query(const char *query, char names[][32], int max_names, char *status, int status_size)
 {
     char enc[96];
     char path[192];
@@ -609,11 +674,7 @@ int W13_SearchLocations(const char *location, char names[][32], int max_names, c
     int r;
     int count = 0;
 
-    if (!location || !location[0] || !names || max_names <= 0) {
-        set_status(status, status_size, "No location set");
-        return 0;
-    }
-    url_encode_query(location, enc, sizeof(enc));
+    url_encode_query(query, enc, sizeof(enc));
     path[0] = 0;
     append_text(path, sizeof(path), "/v1/search?name=");
     append_text(path, sizeof(path), enc);
@@ -623,10 +684,8 @@ int W13_SearchLocations(const char *location, char names[][32], int max_names, c
     if (r <= 0)
         return 0;
     p = find_text(g_http_buf, "\"results\"");
-    if (!p) {
-        set_status(status, status_size, "Location not found");
+    if (!p)
         return 0;
-    }
     while (count < max_names) {
         char *next = json_string_field(p, "name", names[count], 32);
         if (!next || !names[count][0])
@@ -634,8 +693,40 @@ int W13_SearchLocations(const char *location, char names[][32], int max_names, c
         ++count;
         p = next;
     }
+    return count;
+}
+
+static int names_contain_match(const char *location, char names[][32], int count)
+{
+    int i;
+    for (i = 0; i < count; ++i) {
+        if (text_equals_ci(location, names[i]))
+            return 1;
+    }
+    return 0;
+}
+
+int W13_SearchLocations(const char *location, char names[][32], int max_names, char *status, int status_size)
+{
+    char variant[64];
+    int count;
+
+    if (!location || !location[0] || !names || max_names <= 0) {
+        set_status(status, status_size, "No location set");
+        return 0;
+    }
+    count = search_locations_query(location, names, max_names, status, status_size);
+    if (count > 0 && names_contain_match(location, names, count)) {
+        set_status(status, status_size, "Location found");
+        return count;
+    }
+    if (make_german_search_variant(location, variant, sizeof(variant))) {
+        int retry_count = search_locations_query(variant, names, max_names, status, status_size);
+        if (retry_count > 0)
+            count = retry_count;
+    }
     if (count > 0) {
-        if (text_equals_ci(location, names[0]))
+        if (names_contain_match(location, names, count))
             set_status(status, status_size, "Location found");
         else
             set_status(status, status_size, "Similar locations found");
@@ -646,13 +737,13 @@ int W13_SearchLocations(const char *location, char names[][32], int max_names, c
 }
 
 
-static int geocode_location(const char *location, long *lat_e6, long *lon_e6, char *name, int name_size, char *status, int status_size)
+static int geocode_location_query(const char *query, long *lat_e6, long *lon_e6, char *name, int name_size, char *status, int status_size)
 {
     char enc[96];
     char path[192];
     int r;
 
-    url_encode_query(location, enc, sizeof(enc));
+    url_encode_query(query, enc, sizeof(enc));
     path[0] = 0;
     append_text(path, sizeof(path), "/v1/search?name=");
     append_text(path, sizeof(path), enc);
@@ -661,14 +752,37 @@ static int geocode_location(const char *location, long *lat_e6, long *lon_e6, ch
     r = http_fetch(W13_GEO_HOST, path, status, status_size);
     if (r <= 0)
         return 0;
-    if (!find_text(g_http_buf, "\"results\"")) {
-        set_status(status, status_size, "Location not found");
+    if (!find_text(g_http_buf, "\"results\""))
         return 0;
-    }
     *lat_e6 = parse_field_scaled(g_http_buf, "latitude", 1000000);
     *lon_e6 = parse_field_scaled(g_http_buf, "longitude", 1000000);
     if (!json_string_field(g_http_buf, "name", name, name_size) || !name[0])
-        copy_text(name, name_size, location);
+        copy_text(name, name_size, query);
+    return 1;
+}
+
+static int geocode_location(const char *location, long *lat_e6, long *lon_e6, char *name, int name_size, char *status, int status_size)
+{
+    char variant[64];
+
+    if (!geocode_location_query(location, lat_e6, lon_e6, name, name_size, status, status_size)) {
+        if (make_german_search_variant(location, variant, sizeof(variant)) &&
+            geocode_location_query(variant, lat_e6, lon_e6, name, name_size, status, status_size))
+            return 1;
+        set_status(status, status_size, "Location not found");
+        return 0;
+    }
+    if (!text_equals_ci(location, name) && make_german_search_variant(location, variant, sizeof(variant))) {
+        long retry_lat = 0;
+        long retry_lon = 0;
+        char retry_name[32];
+        retry_name[0] = 0;
+        if (geocode_location_query(variant, &retry_lat, &retry_lon, retry_name, sizeof(retry_name), status, status_size)) {
+            *lat_e6 = retry_lat;
+            *lon_e6 = retry_lon;
+            copy_text(name, name_size, retry_name);
+        }
+    }
     return 1;
 }
 
