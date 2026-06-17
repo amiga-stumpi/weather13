@@ -34,6 +34,18 @@ static void close_libraries(void)
     }
 }
 
+static void copy_text(char *dst, int dst_size, const char *src)
+{
+    int i = 0;
+    if (dst_size <= 0)
+        return;
+    while (src && src[i] && i < dst_size - 1) {
+        dst[i] = src[i];
+        ++i;
+    }
+    dst[i] = 0;
+}
+
 static int is_quit_key(UWORD code)
 {
     code &= 0x7f;
@@ -60,6 +72,8 @@ int main(void)
     W13_InitLanguage();
     W13_LoadConfig(&app.config);
     W13_FillDummyWeather(&app.data);
+    if (app.config.location[0])
+        copy_text(app.data.location, sizeof(app.data.location), app.config.location);
     if (!W13_Open(&app)) {
         close_libraries();
         return 20;
@@ -82,6 +96,9 @@ int main(void)
                 app.config.width = app.win->Width;
                 app.config.height = app.win->Height;
                 W13_DrawAll(&app);
+            } else if (cls == IDCMP_MENUPICK) {
+                if (W13_HandleMenu(&app, code))
+                    done = 1;
             } else if (cls == IDCMP_REFRESHWINDOW) {
                 BeginRefresh(app.win);
                 W13_DrawAll(&app);

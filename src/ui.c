@@ -7,8 +7,11 @@
 #include <intuition/intuition.h>
 #include <string.h>
 #include <proto/dos.h>
+#include <proto/exec.h>
 #include <proto/graphics.h>
 #include <proto/intuition.h>
+
+#define W13_VERSION "v0.1"
 
 #define W13_MIN_W 320
 #define W13_MIN_H 178
@@ -63,6 +66,40 @@ static void config_defaults(W13WindowConfig *cfg)
     cfg->top = 20;
     cfg->width = W13_DEFAULT_W;
     cfg->height = W13_DEFAULT_H;
+    cfg->location[0] = 'M';
+    cfg->location[1] = 'u';
+    cfg->location[2] = 'e';
+    cfg->location[3] = 'n';
+    cfg->location[4] = 's';
+    cfg->location[5] = 't';
+    cfg->location[6] = 'e';
+    cfg->location[7] = 'r';
+    cfg->location[8] = 0;
+}
+
+
+static void copy_config_text(char *dst, int dst_size, const char *src)
+{
+    int i = 0;
+    if (dst_size <= 0)
+        return;
+    while (src && src[i] && i < dst_size - 1) {
+        dst[i] = src[i];
+        ++i;
+    }
+    dst[i] = 0;
+}
+
+static void config_set_text(W13WindowConfig *cfg, const char *line)
+{
+    const char *value = line;
+
+    while (*value && *value != '=')
+        ++value;
+    if (*value == '=')
+        ++value;
+    if (key_equals(line, "LOCATION"))
+        copy_config_text(cfg->location, sizeof(cfg->location), value);
 }
 
 static void config_set_value(W13WindowConfig *cfg, const char *line)
@@ -110,8 +147,10 @@ void W13_LoadConfig(W13WindowConfig *cfg)
             continue;
         if (c == '\n') {
             line[pos] = 0;
-            if (pos > 0 && line[0] != '#')
+            if (pos > 0 && line[0] != '#') {
                 config_set_value(cfg, line);
+                config_set_text(cfg, line);
+            }
             pos = 0;
         } else if (pos < (int)sizeof(line) - 1) {
             line[pos++] = c;
@@ -119,8 +158,10 @@ void W13_LoadConfig(W13WindowConfig *cfg)
     }
     if (pos > 0) {
         line[pos] = 0;
-        if (line[0] != '#')
+        if (line[0] != '#') {
             config_set_value(cfg, line);
+            config_set_text(cfg, line);
+        }
     }
 
     if (cfg->width < W13_MIN_W || cfg->width > 640)
@@ -166,6 +207,23 @@ static void config_write_num(BPTR fh, const char *key, long value)
     Write(fh, line, p);
 }
 
+
+static void config_write_text(BPTR fh, const char *key, const char *value)
+{
+    char line[80];
+    int p = 0;
+    int i = 0;
+
+    while (*key && p < (int)sizeof(line) - 1)
+        line[p++] = *key++;
+    if (p < (int)sizeof(line) - 1)
+        line[p++] = '=';
+    while (value && value[i] && p < (int)sizeof(line) - 2)
+        line[p++] = value[i++];
+    line[p++] = '\n';
+    Write(fh, line, p);
+}
+
 void W13_SaveConfig(const W13WindowConfig *cfg)
 {
     BPTR fh;
@@ -180,6 +238,7 @@ void W13_SaveConfig(const W13WindowConfig *cfg)
     config_write_num(fh, "TOP", cfg->top);
     config_write_num(fh, "WIDTH", cfg->width);
     config_write_num(fh, "HEIGHT", cfg->height);
+    config_write_text(fh, "LOCATION", cfg->location);
     Close(fh);
 }
 
@@ -366,6 +425,56 @@ static void draw_temp_large(struct RastPort *rp, WORD x, WORD y, const char *s)
     draw_text(rp, x + 1, y, s);
 }
 
+
+static struct IntuiText w13_info_text = { 1, 0, JAM1, 0, 1, 0, (UBYTE *)"Info", 0 };
+static struct IntuiText w13_quit_text = { 1, 0, JAM1, 0, 1, 0, (UBYTE *)"Quit", 0 };
+static struct IntuiText w13_location_text = { 1, 0, JAM1, 0, 1, 0, (UBYTE *)"Location...", 0 };
+
+static struct MenuItem w13_project_items[2];
+static struct MenuItem w13_settings_items[1];
+static struct Menu w13_menus[2];
+
+static void init_menu_item(struct MenuItem *item, struct MenuItem *next, WORD top, WORD width, struct IntuiText *text)
+{
+    memset(item, 0, sizeof(*item));
+    item->NextItem = next;
+    item->LeftEdge = 0;
+    item->TopEdge = top;
+    item->Width = width;
+    item->Height = 10;
+    item->Flags = ITEMTEXT | ITEMENABLED | HIGHCOMP;
+    item->ItemFill = (APTR)text;
+}
+
+static void setup_menus(W13App *app)
+{
+    if (!app || !app->win)
+        return;
+    init_menu_item(&w13_project_items[0], &w13_project_items[1], 0, 64, &w13_info_text);
+    init_menu_item(&w13_project_items[1], 0, 10, 64, &w13_quit_text);
+    init_menu_item(&w13_settings_items[0], 0, 0, 92, &w13_location_text);
+
+    memset(w13_menus, 0, sizeof(w13_menus));
+    w13_menus[0].NextMenu = &w13_menus[1];
+    w13_menus[0].LeftEdge = 0;
+    w13_menus[0].TopEdge = 0;
+    w13_menus[0].Width = 72;
+    w13_menus[0].Height = 10;
+    w13_menus[0].Flags = MENUENABLED;
+    w13_menus[0].MenuName = (UBYTE *)"Project";
+    w13_menus[0].FirstItem = &w13_project_items[0];
+
+    w13_menus[1].LeftEdge = 72;
+    w13_menus[1].TopEdge = 0;
+    w13_menus[1].Width = 80;
+    w13_menus[1].Height = 10;
+    w13_menus[1].Flags = MENUENABLED;
+    w13_menus[1].MenuName = (UBYTE *)"Settings";
+    w13_menus[1].FirstItem = &w13_settings_items[0];
+
+    SetMenuStrip(app->win, &w13_menus[0]);
+}
+
 int W13_Open(W13App *app)
 {
     struct NewWindow nw;
@@ -389,7 +498,7 @@ int W13_Open(W13App *app)
     nw.Height = height;
     nw.DetailPen = 0;
     nw.BlockPen = 1;
-    nw.IDCMPFlags = IDCMP_CLOSEWINDOW | IDCMP_REFRESHWINDOW | IDCMP_RAWKEY | IDCMP_NEWSIZE;
+    nw.IDCMPFlags = IDCMP_CLOSEWINDOW | IDCMP_REFRESHWINDOW | IDCMP_RAWKEY | IDCMP_NEWSIZE | IDCMP_MENUPICK;
     nw.Flags = WFLG_DRAGBAR | WFLG_DEPTHGADGET | WFLG_CLOSEGADGET |
                WFLG_SIZEGADGET | WFLG_SMART_REFRESH | WFLG_ACTIVATE;
     nw.FirstGadget = 0;
@@ -405,7 +514,7 @@ int W13_Open(W13App *app)
 
     app->win = OpenWindow(&nw);
     if (!app->win) {
-        nw.IDCMPFlags = IDCMP_CLOSEWINDOW | IDCMP_REFRESHWINDOW | IDCMP_RAWKEY;
+        nw.IDCMPFlags = IDCMP_CLOSEWINDOW | IDCMP_REFRESHWINDOW | IDCMP_RAWKEY | IDCMP_MENUPICK;
         nw.Flags = WFLG_DRAGBAR | WFLG_DEPTHGADGET | WFLG_CLOSEGADGET |
                    WFLG_SMART_REFRESH | WFLG_ACTIVATE;
         nw.LeftEdge = 0;
@@ -435,6 +544,7 @@ int W13_Open(W13App *app)
         app->asset_depth = 3;
     else
         app->asset_depth = 2;
+    setup_menus(app);
     return 1;
 }
 
@@ -445,9 +555,213 @@ void W13_Close(W13App *app)
         app->config.top = app->win->TopEdge;
         app->config.width = app->win->Width;
         app->config.height = app->win->Height;
+        ClearMenuStrip(app->win);
         CloseWindow(app->win);
         app->win = 0;
     }
+}
+
+static int inside(WORD x, WORD y, WORD l, WORD t, WORD r, WORD b)
+{
+    return x >= l && x <= r && y >= t && y <= b;
+}
+
+static void draw_button(struct RastPort *rp, WORD x1, WORD y1, WORD x2, WORD y2, const char *label)
+{
+    SetAPen(rp, 1);
+    Move(rp, x1, y1);
+    Draw(rp, x2, y1);
+    Draw(rp, x2, y2);
+    Draw(rp, x1, y2);
+    Draw(rp, x1, y1);
+    draw_text(rp, (WORD)(x1 + 8), (WORD)(y1 + 12), label);
+}
+
+void W13_ShowInfo(W13App *app)
+{
+    struct NewWindow nw;
+    struct Window *win;
+    ULONG mask;
+    int done = 0;
+    WORD left = 20;
+    WORD top = 18;
+
+    if (app && app->win) {
+        left = app->win->LeftEdge + 18;
+        top = app->win->TopEdge + 16;
+    }
+    memset(&nw, 0, sizeof(nw));
+    nw.LeftEdge = left;
+    nw.TopEdge = top;
+    nw.Width = 320;
+    nw.Height = 112;
+    nw.DetailPen = 0;
+    nw.BlockPen = 1;
+    nw.IDCMPFlags = IDCMP_CLOSEWINDOW | IDCMP_MOUSEBUTTONS | IDCMP_RAWKEY;
+    nw.Flags = WFLG_DRAGBAR | WFLG_DEPTHGADGET | WFLG_CLOSEGADGET | WFLG_SMART_REFRESH | WFLG_ACTIVATE;
+    nw.Title = (UBYTE *)"Info";
+    nw.Type = WBENCHSCREEN;
+    win = OpenWindow(&nw);
+    if (!win)
+        return;
+    SetDrMd(win->RPort, JAM1);
+    SetBPen(win->RPort, 0);
+    SetAPen(win->RPort, 0);
+    RectFill(win->RPort, 2, 10, win->Width - 3, win->Height - 3);
+    SetAPen(win->RPort, 1);
+    draw_text(win->RPort, 12, 24, "Weather13 for Kick1.3");
+    draw_text(win->RPort, 12, 36, "Version: " W13_VERSION);
+    draw_text(win->RPort, 12, 48, "by Marcel Jaehne");
+    draw_text(win->RPort, 12, 60, "(c) 2026");
+    draw_text(win->RPort, 12, 72, "If you want to buy me a coffe,");
+    draw_text(win->RPort, 12, 84, "send me a buck: paypal.me/mytubefree");
+    draw_button(win->RPort, 128, 92, 190, 108, "OK");
+    mask = 1UL << win->UserPort->mp_SigBit;
+    while (!done) {
+        struct IntuiMessage *msg;
+        Wait(mask);
+        while ((msg = (struct IntuiMessage *)GetMsg(win->UserPort)) != 0) {
+            ULONG cls = msg->Class;
+            WORD mx = msg->MouseX;
+            WORD my = msg->MouseY;
+            UWORD code = msg->Code;
+            ReplyMsg((struct Message *)msg);
+            if (cls == IDCMP_CLOSEWINDOW)
+                done = 1;
+            else if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN && inside(mx, my, 128, 92, 190, 108))
+                done = 1;
+            else if (cls == IDCMP_RAWKEY && ((code & 0x7f) == 0x44 || (code & 0x7f) == 0x45))
+                done = 1;
+        }
+    }
+    CloseWindow(win);
+}
+
+void W13_ShowLocation(W13App *app)
+{
+    struct NewWindow nw;
+    struct Window *win;
+    struct Gadget loc_gadget;
+    struct StringInfo loc_info;
+    static char loc_buf[32];
+    static char loc_undo[32];
+    ULONG mask;
+    int done = 0;
+    WORD left = 24;
+    WORD top = 24;
+    if (!app)
+        return;
+    copy_config_text(loc_buf, sizeof(loc_buf), app->config.location[0] ? app->config.location : app->data.location);
+    loc_undo[0] = 0;
+    memset(&loc_info, 0, sizeof(loc_info));
+    loc_info.Buffer = (UBYTE *)loc_buf;
+    loc_info.UndoBuffer = (UBYTE *)loc_undo;
+    loc_info.MaxChars = sizeof(loc_buf);
+    memset(&loc_gadget, 0, sizeof(loc_gadget));
+    loc_gadget.LeftEdge = 68;
+    loc_gadget.TopEdge = 28;
+    loc_gadget.Width = 180;
+    loc_gadget.Height = 12;
+    loc_gadget.Flags = GADGHCOMP;
+    loc_gadget.Activation = RELVERIFY;
+    loc_gadget.GadgetType = STRGADGET;
+    loc_gadget.SpecialInfo = (APTR)&loc_info;
+    loc_gadget.GadgetID = 1;
+
+    if (app->win) {
+        left = app->win->LeftEdge + 24;
+        top = app->win->TopEdge + 24;
+    }
+    memset(&nw, 0, sizeof(nw));
+    nw.LeftEdge = left;
+    nw.TopEdge = top;
+    nw.Width = 300;
+    nw.Height = 92;
+    nw.DetailPen = 0;
+    nw.BlockPen = 1;
+    nw.IDCMPFlags = IDCMP_CLOSEWINDOW | IDCMP_MOUSEBUTTONS | IDCMP_GADGETUP | IDCMP_RAWKEY;
+    nw.Flags = WFLG_DRAGBAR | WFLG_DEPTHGADGET | WFLG_CLOSEGADGET | WFLG_SMART_REFRESH | WFLG_ACTIVATE;
+    nw.FirstGadget = &loc_gadget;
+    nw.Title = (UBYTE *)"Location";
+    nw.Type = WBENCHSCREEN;
+    win = OpenWindow(&nw);
+    if (!win)
+        return;
+    SetDrMd(win->RPort, JAM1);
+    SetBPen(win->RPort, 0);
+    SetAPen(win->RPort, 0);
+    RectFill(win->RPort, 2, 10, win->Width - 3, win->Height - 3);
+    SetAPen(win->RPort, 1);
+    draw_text(win->RPort, 12, 38, "Ort:");
+    draw_box(win->RPort, 66, 26, 250, 42, 1);
+    draw_text(win->RPort, 12, 56, "Open-Meteo search: /v1/search?name=");
+    draw_button(win->RPort, 32, 66, 96, 82, "Search");
+    draw_button(win->RPort, 116, 66, 170, 82, "Set");
+    draw_button(win->RPort, 190, 66, 256, 82, "Cancel");
+    ActivateGadget(&loc_gadget, win, 0);
+    mask = 1UL << win->UserPort->mp_SigBit;
+    while (!done) {
+        struct IntuiMessage *msg;
+        Wait(mask);
+        while ((msg = (struct IntuiMessage *)GetMsg(win->UserPort)) != 0) {
+            ULONG cls = msg->Class;
+            WORD mx = msg->MouseX;
+            WORD my = msg->MouseY;
+            UWORD code = msg->Code;
+            ReplyMsg((struct Message *)msg);
+            if (cls == IDCMP_CLOSEWINDOW) {
+                done = 1;
+            } else if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) {
+                if (inside(mx, my, 32, 66, 96, 82)) {
+                    SetAPen(win->RPort, 0);
+                    RectFill(win->RPort, 10, 48, 288, 60);
+                    SetAPen(win->RPort, 1);
+                    draw_text(win->RPort, 12, 56, "Search noted; HTTP lookup comes next.");
+                } else if (inside(mx, my, 116, 66, 170, 82)) {
+                    if (loc_buf[0]) {
+                        copy_config_text(app->config.location, sizeof(app->config.location), loc_buf);
+                        copy_config_text(app->data.location, sizeof(app->data.location), loc_buf);
+                        if (app->win)
+                            W13_DrawAll(app);
+                    }
+                    done = 1;
+                } else if (inside(mx, my, 190, 66, 256, 82)) {
+                    done = 1;
+                }
+            } else if (cls == IDCMP_RAWKEY) {
+                UWORD raw = code & 0x7f;
+                if (raw == 0x44) {
+                    if (loc_buf[0]) {
+                        copy_config_text(app->config.location, sizeof(app->config.location), loc_buf);
+                        copy_config_text(app->data.location, sizeof(app->data.location), loc_buf);
+                        if (app->win)
+                            W13_DrawAll(app);
+                    }
+                    done = 1;
+                } else if (raw == 0x45) {
+                    done = 1;
+                }
+            }
+        }
+    }
+    CloseWindow(win);
+}
+
+int W13_HandleMenu(W13App *app, UWORD code)
+{
+    UWORD menu = MENUNUM(code);
+    UWORD item = ITEMNUM(code);
+
+    if (code == MENUNULL)
+        return 0;
+    if (menu == 0 && item == 0) {
+        W13_ShowInfo(app);
+    } else if (menu == 0 && item == 1) {
+        return 1;
+    } else if (menu == 1 && item == 0) {
+        W13_ShowLocation(app);
+    }
+    return 0;
 }
 
 void W13_DrawAll(W13App *app)

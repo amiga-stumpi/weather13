@@ -9,6 +9,7 @@ typedef struct W13WindowConfig {
     WORD top;
     WORD width;
     WORD height;
+    char location[32];
 } W13WindowConfig;
 
 typedef struct W13App {
@@ -24,5 +25,8 @@ void W13_SaveConfig(const W13WindowConfig *cfg);
 int W13_Open(W13App *app);
 void W13_Close(W13App *app);
 void W13_DrawAll(W13App *app);
+int W13_HandleMenu(W13App *app, UWORD code);
+void W13_ShowInfo(W13App *app);
+void W13_ShowLocation(W13App *app);
 
 #endif
