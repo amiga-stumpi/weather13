@@ -307,7 +307,7 @@ static void build_request(char *req, int req_size, const char *host, const char 
     append_text(req, req_size, path);
     append_text(req, req_size, " HTTP/1.0\r\nHost: ");
     append_text(req, req_size, host);
-    append_text(req, req_size, "\r\nUser-Agent: Weather13/0.1 (AmigaOS 1.3)\r\nConnection: close\r\n\r\n");
+    append_text(req, req_size, "\r\nUser-Agent: Weather13/1.1 (AmigaOS 1.3)\r\nConnection: close\r\n\r\n");
 }
 
 static int http_fetch(const char *host, const char *path, char *status, int status_size)

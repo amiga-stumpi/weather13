@@ -12,7 +12,7 @@
 #include <proto/graphics.h>
 #include <proto/intuition.h>
 
-#define W13_VERSION "v0.1"
+#define W13_VERSION "v1.1"
 
 #define W13_MIN_W 320
 #define W13_MIN_H 178
