@@ -728,11 +728,13 @@ void W13_ShowInfo(W13App *app)
 }
 
 
-static void location_run_search(W13App *app, struct Window *win, const char *loc_buf,
+static void location_run_search(W13App *app, struct Window *win, const char *loc_buf, char *selected_name, int selected_name_size,
     char found_names[][32], char *result1, int result1_size, char *result2, int result2_size)
 {
     int count;
 
+    if (selected_name && selected_name_size > 0)
+        selected_name[0] = 0;
     if (!app || !win || !loc_buf || !loc_buf[0])
         return;
     W13_SetStatus(app, W13_Text(W13_TX_MSG_SEARCHING));
@@ -755,6 +757,8 @@ static void location_run_search(W13App *app, struct Window *win, const char *loc
             cat_text(result1, result1_size, found_names[match]);
             draw_location_result(win, result1, 0);
             copy_config_text(app->config.location, sizeof(app->config.location), found_names[match]);
+            if (selected_name)
+                copy_config_text(selected_name, selected_name_size, found_names[match]);
             W13_FetchWeatherForLocation(found_names[match], &app->data, app->status, sizeof(app->status));
             W13_SetStatus(app, app->status[0] ? app->status : W13_Text(W13_TX_MSG_SEARCH_DONE));
         } else {
@@ -783,6 +787,7 @@ void W13_ShowLocation(W13App *app)
     static char loc_buf[32];
     static char loc_undo[32];
     char found_names[3][32];
+    char selected_name[32];
     char result1[48];
     char result2[80];
     ULONG mask;
@@ -791,6 +796,7 @@ void W13_ShowLocation(W13App *app)
     WORD top = 24;
     if (!app)
         return;
+    selected_name[0] = 0;
     copy_config_text(loc_buf, sizeof(loc_buf), app->config.location[0] ? app->config.location : app->data.location);
     loc_undo[0] = 0;
     memset(&loc_info, 0, sizeof(loc_info));
@@ -853,9 +859,14 @@ void W13_ShowLocation(W13App *app)
                 done = 1;
             } else if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) {
                 if (inside(mx, my, 32, 84, 96, 100)) {
-                    location_run_search(app, win, loc_buf, found_names, result1, sizeof(result1), result2, sizeof(result2));
+                    location_run_search(app, win, loc_buf, selected_name, sizeof(selected_name), found_names, result1, sizeof(result1), result2, sizeof(result2));
                 } else if (inside(mx, my, 116, 84, 170, 100)) {
-                    if (loc_buf[0]) {
+                    if (selected_name[0]) {
+                        copy_config_text(app->config.location, sizeof(app->config.location), selected_name);
+                        copy_config_text(app->data.location, sizeof(app->data.location), selected_name);
+                        if (app->win)
+                            W13_DrawAll(app);
+                    } else if (loc_buf[0]) {
                         copy_config_text(app->config.location, sizeof(app->config.location), loc_buf);
                         copy_config_text(app->data.location, sizeof(app->data.location), loc_buf);
                         if (app->win)
@@ -865,10 +876,12 @@ void W13_ShowLocation(W13App *app)
                 } else if (inside(mx, my, 190, 84, 256, 100)) {
                     done = 1;
                 }
+            } else if (cls == IDCMP_GADGETUP) {
+                selected_name[0] = 0;
             } else if (cls == IDCMP_RAWKEY) {
                 UWORD raw = code & 0x7f;
                 if (raw == 0x44) {
-                    location_run_search(app, win, loc_buf, found_names, result1, sizeof(result1), result2, sizeof(result2));
+                    location_run_search(app, win, loc_buf, selected_name, sizeof(selected_name), found_names, result1, sizeof(result1), result2, sizeof(result2));
                 } else if (raw == 0x45) {
                     done = 1;
                 }
