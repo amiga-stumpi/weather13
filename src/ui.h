@@ -19,6 +19,11 @@ typedef struct W13App {
     UWORD asset_depth;
     W13WindowConfig config;
     char status[64];
+    WORD wind_jitter_x;
+    WORD wind_jitter_y;
+    UWORD anim_ticks;
+    UWORD anim_next;
+    UWORD anim_phase;
 } W13App;
 
 void W13_LoadConfig(W13WindowConfig *cfg);

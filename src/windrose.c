@@ -29,7 +29,7 @@ static void draw_small_text(struct RastPort *rp, int x, int y, const char *s)
 }
 
 void W13_DrawWindRose(struct RastPort *rp, int cx, int cy, int radius,
-                      int wind_dir_deg, int wind_speed, UBYTE pen)
+                      int wind_dir_deg, int wind_speed, WORD jitter_x, WORD jitter_y, UBYTE pen)
 {
     int idx;
     int x;
@@ -58,8 +58,8 @@ void W13_DrawWindRose(struct RastPort *rp, int cx, int cy, int radius,
         wind_dir_deg += 360;
     wind_dir_deg %= 360;
     idx = ((wind_dir_deg + 11) / 22) & 15;
-    x = cx + (dx16[idx] * (radius - 5)) / 10;
-    y = cy + (dy16[idx] * (radius - 5)) / 10;
+    x = cx + (dx16[idx] * (radius - 5)) / 10 + jitter_x;
+    y = cy + (dy16[idx] * (radius - 5)) / 10 + jitter_y;
     Move(rp, cx, cy);
     Draw(rp, x, y);
     Move(rp, x - 2, y);

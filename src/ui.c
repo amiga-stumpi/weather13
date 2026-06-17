@@ -499,7 +499,7 @@ int W13_Open(W13App *app)
     nw.Height = height;
     nw.DetailPen = 0;
     nw.BlockPen = 1;
-    nw.IDCMPFlags = IDCMP_CLOSEWINDOW | IDCMP_REFRESHWINDOW | IDCMP_RAWKEY | IDCMP_NEWSIZE | IDCMP_MENUPICK;
+    nw.IDCMPFlags = IDCMP_CLOSEWINDOW | IDCMP_REFRESHWINDOW | IDCMP_RAWKEY | IDCMP_NEWSIZE | IDCMP_MENUPICK | IDCMP_INTUITICKS;
     nw.Flags = WFLG_DRAGBAR | WFLG_DEPTHGADGET | WFLG_CLOSEGADGET |
                WFLG_SIZEGADGET | WFLG_SMART_REFRESH | WFLG_ACTIVATE;
     nw.FirstGadget = 0;
@@ -515,7 +515,7 @@ int W13_Open(W13App *app)
 
     app->win = OpenWindow(&nw);
     if (!app->win) {
-        nw.IDCMPFlags = IDCMP_CLOSEWINDOW | IDCMP_REFRESHWINDOW | IDCMP_RAWKEY | IDCMP_MENUPICK;
+        nw.IDCMPFlags = IDCMP_CLOSEWINDOW | IDCMP_REFRESHWINDOW | IDCMP_RAWKEY | IDCMP_MENUPICK | IDCMP_INTUITICKS;
         nw.Flags = WFLG_DRAGBAR | WFLG_DEPTHGADGET | WFLG_CLOSEGADGET |
                    WFLG_SMART_REFRESH | WFLG_ACTIVATE;
         nw.LeftEdge = 0;
@@ -859,7 +859,7 @@ void W13_DrawAll(W13App *app)
     cat_text(line, sizeof(line), " km/h ");
     cat_text(line, sizeof(line), W13_WindDirName(app->data.wind_dir_deg));
     draw_text(rp, wind_x - 5, 53, line);
-    W13_DrawWindRose(rp, wind_x + 86, 72, 26, app->data.wind_dir_deg, app->data.wind_speed, 1);
+    W13_DrawWindRose(rp, wind_x + 86, 72, 26, app->data.wind_dir_deg, app->data.wind_speed, app->wind_jitter_x, app->wind_jitter_y, 1);
 
     draw_forecast(app, 8, forecast_y - 2, (WORD)(w - 18));
 

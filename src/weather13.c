@@ -59,6 +59,23 @@ static int is_update_key(UWORD code)
     return code == 0x16; /* U on Amiga raw keyboard */
 }
 
+static void update_wind_jitter(W13App *app)
+{
+    static const WORD offsets[][2] = {
+        { 0, 0 }, { 1, 0 }, { 2, 1 }, { 1, 0 },
+        { 0, 0 }, { -1, 0 }, { -2, -1 }, { -1, 0 }
+    };
+    UWORD count = (UWORD)(sizeof(offsets) / sizeof(offsets[0]));
+
+    if (!app)
+        return;
+    app->anim_phase = (UWORD)((app->anim_phase + 1) % count);
+    app->wind_jitter_x = offsets[app->anim_phase][0];
+    app->wind_jitter_y = offsets[app->anim_phase][1];
+    app->anim_ticks = 0;
+    app->anim_next = (UWORD)(20 + ((app->anim_phase * 7) % 31));
+}
+
 int main(void)
 {
     W13App app;
@@ -80,6 +97,7 @@ int main(void)
         close_libraries();
         return 20;
     }
+    app.anim_next = 30;
     W13_DrawAll(&app);
     sigmask = 1UL << app.win->UserPort->mp_SigBit;
 
@@ -105,12 +123,21 @@ int main(void)
                 BeginRefresh(app.win);
                 W13_DrawAll(&app);
                 EndRefresh(app.win, TRUE);
+            } else if (cls == IDCMP_INTUITICKS) {
+                ++app.anim_ticks;
+                if (app.anim_ticks >= app.anim_next) {
+                    update_wind_jitter(&app);
+                    W13_DrawAll(&app);
+                }
             } else if (cls == IDCMP_RAWKEY) {
                 if (is_quit_key(code)) {
                     done = 1;
                 } else if (is_update_key(code)) {
-                    W13_FillDummyWeather(&app.data);
-    copy_text(app.status, sizeof(app.status), "Demo data");
+                    W13_SetStatus(&app, "Updating...");
+                    if (!W13_FetchWeatherForLocation(app.config.location[0] ? app.config.location : app.data.location, &app.data, app.status, sizeof(app.status)))
+                        W13_SetStatus(&app, app.status[0] ? app.status : "Update failed");
+                    else
+                        W13_SetStatus(&app, app.status);
                     W13_DrawAll(&app);
                 }
             }
