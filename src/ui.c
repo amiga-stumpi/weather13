@@ -487,9 +487,9 @@ static void draw_forecast(W13App *app, WORD x, WORD y, WORD w)
 static void draw_temp_large(struct RastPort *rp, WORD x, WORD y, const char *s)
 {
     SetDrMd(rp, JAM1);
-    SetAPen(rp, 3);
+    SetAPen(rp, 1);
     draw_text(rp, x, y, s);
-    SetAPen(rp, 3);
+    SetAPen(rp, 1);
     draw_text(rp, x + 1, y, s);
 }
 
@@ -1234,19 +1234,21 @@ void W13_DrawAll(W13App *app)
 
     icon = Weather13_GetIcon((UWORD)app->data.weather_code, 48, app->screen_depth);
     draw_icon(rp, icon, 20, 42, max_pen);
-    SetAPen(rp, 1);
+    SetAPen(rp, 3);
     draw_text(rp, 82, 58, W13_ConditionText(app->data.weather_code));
     line[0] = 0;
     cat_text(line, sizeof(line), W13_Text(W13_TX_HUMIDITY));
     cat_text(line, sizeof(line), " ");
     cat_num(line, sizeof(line), app->data.humidity);
     cat_text(line, sizeof(line), "%");
+    SetAPen(rp, 3);
     draw_text(rp, 82, 74, line);
     line[0] = 0;
     cat_text(line, sizeof(line), W13_Text(W13_TX_PRESSURE));
     cat_text(line, sizeof(line), " ");
     cat_num(line, sizeof(line), app->data.pressure);
     cat_text(line, sizeof(line), " hPa");
+    SetAPen(rp, 3);
     draw_text(rp, 82, 90, line);
 
     temp_text(line, sizeof(line), app->data.temp_tenths);
@@ -1258,9 +1260,10 @@ void W13_DrawAll(W13App *app)
     }
     cat_text(line, sizeof(line), ")");
     draw_temp_large(rp, (WORD)(w / 2 - 58), 58, line);
-    SetAPen(rp, 3);
+    SetAPen(rp, 1);
     draw_text(rp, (WORD)(w / 2 - 34), 78, app->data.location);
 
+    SetAPen(rp, 1);
     draw_text(rp, wind_x + 20, 41, W13_Text(W13_TX_WIND));
     line[0] = 0;
     cat_num(line, sizeof(line), app->data.wind_speed);
