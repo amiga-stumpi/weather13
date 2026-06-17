@@ -803,14 +803,14 @@ void W13_DrawWindRoseOnly(W13App *app)
     struct RastPort *rp;
     WORD wind_x;
     WORD cx;
-    WORD cy = 65;
+    WORD cy = 67;
     WORD radius = 26;
 
     if (!app || !app->win)
         return;
     rp = app->win->RPort;
     wind_x = wind_area_x(app);
-    cx = (WORD)(wind_x + 111);
+    cx = (WORD)(wind_x + 110);
     SetAPen(rp, 0);
     RectFill(rp, cx - radius - 14, cy - radius - 8, cx + radius + 16, cy + radius + 14);
     SetBPen(rp, 0);
