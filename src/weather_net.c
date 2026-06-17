@@ -666,7 +666,25 @@ static int make_german_search_variant(const char *src, char *dst, int dst_size)
     return changed && dst[0];
 }
 
-static int search_locations_query(const char *query, char names[][32], int max_names, char *status, int status_size)
+
+static void build_location_label(char *dst, int dst_size, const char *name, const char *admin1, const char *country)
+{
+    dst[0] = 0;
+    append_text(dst, dst_size, name);
+    if (admin1 && admin1[0]) {
+        append_text(dst, dst_size, " - ");
+        append_text(dst, dst_size, admin1);
+    }
+    if (country && country[0]) {
+        if (admin1 && admin1[0])
+            append_text(dst, dst_size, ", ");
+        else
+            append_text(dst, dst_size, " - ");
+        append_text(dst, dst_size, country);
+    }
+}
+
+static int search_locations_query(const char *query, char names[][32], char labels[][64], int max_names, char *status, int status_size)
 {
     char enc[96];
     char path[192];
@@ -687,9 +705,17 @@ static int search_locations_query(const char *query, char names[][32], int max_n
     if (!p)
         return 0;
     while (count < max_names) {
+        char admin1[32];
+        char country[32];
         char *next = json_string_field(p, "name", names[count], 32);
         if (!next || !names[count][0])
             break;
+        admin1[0] = 0;
+        country[0] = 0;
+        json_string_field(next, "admin1", admin1, sizeof(admin1));
+        json_string_field(next, "country", country, sizeof(country));
+        if (labels)
+            build_location_label(labels[count], 64, names[count], admin1, country);
         ++count;
         p = next;
     }
@@ -706,7 +732,7 @@ static int names_contain_match(const char *location, char names[][32], int count
     return 0;
 }
 
-int W13_SearchLocations(const char *location, char names[][32], int max_names, char *status, int status_size)
+int W13_SearchLocations(const char *location, char names[][32], char labels[][64], int max_names, char *status, int status_size)
 {
     char variant[64];
     int count;
@@ -715,13 +741,13 @@ int W13_SearchLocations(const char *location, char names[][32], int max_names, c
         set_status(status, status_size, "No location set");
         return 0;
     }
-    count = search_locations_query(location, names, max_names, status, status_size);
+    count = search_locations_query(location, names, labels, max_names, status, status_size);
     if (count > 0 && names_contain_match(location, names, count)) {
         set_status(status, status_size, "Location found");
         return count;
     }
     if (make_german_search_variant(location, variant, sizeof(variant))) {
-        int retry_count = search_locations_query(variant, names, max_names, status, status_size);
+        int retry_count = search_locations_query(variant, names, labels, max_names, status, status_size);
         if (retry_count > 0)
             count = retry_count;
     }

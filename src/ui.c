@@ -729,7 +729,7 @@ void W13_ShowInfo(W13App *app)
 
 
 static void location_run_search(W13App *app, struct Window *win, const char *loc_buf, char *selected_name, int selected_name_size,
-    char found_names[][32], char *result1, int result1_size, char *result2, int result2_size)
+    char found_names[][32], char found_labels[][64], char *result1, int result1_size, char *result2, int result2_size)
 {
     int count;
 
@@ -738,7 +738,7 @@ static void location_run_search(W13App *app, struct Window *win, const char *loc
     if (!app || !win || !loc_buf || !loc_buf[0])
         return;
     W13_SetStatus(app, W13_Text(W13_TX_MSG_SEARCHING));
-    count = W13_SearchLocations(loc_buf, found_names, 3, app->status, sizeof(app->status));
+    count = W13_SearchLocations(loc_buf, found_names, found_labels, 3, app->status, sizeof(app->status));
     if (count <= 0) {
         draw_location_result(win, W13_Text(W13_TX_MSG_LOCATION_NOT_FOUND), 0);
         W13_SetStatus(app, app->status[0] ? app->status : W13_Text(W13_TX_MSG_SEARCH_FAILED));
@@ -754,7 +754,7 @@ static void location_run_search(W13App *app, struct Window *win, const char *loc
         if (match >= 0) {
             result1[0] = 0;
             cat_text(result1, result1_size, W13_Text(W13_TX_MSG_FOUND_PREFIX));
-            cat_text(result1, result1_size, found_names[match]);
+            cat_text(result1, result1_size, found_labels[match][0] ? found_labels[match] : found_names[match]);
             draw_location_result(win, result1, 0);
             copy_config_text(app->config.location, sizeof(app->config.location), found_names[match]);
             if (selected_name)
@@ -768,8 +768,8 @@ static void location_run_search(W13App *app, struct Window *win, const char *loc
                 if (text_equals_ci(loc_buf, found_names[i]))
                     continue;
                 if (shown > 0)
-                    cat_text(result2, result2_size, ", ");
-                cat_text(result2, result2_size, found_names[i]);
+                    cat_text(result2, result2_size, "; ");
+                cat_text(result2, result2_size, found_labels[i][0] ? found_labels[i] : found_names[i]);
                 ++shown;
             }
             draw_location_result(win, W13_Text(W13_TX_MSG_LOCATION_TRY), result2);
@@ -787,6 +787,7 @@ void W13_ShowLocation(W13App *app)
     static char loc_buf[32];
     static char loc_undo[32];
     char found_names[3][32];
+    char found_labels[3][64];
     char selected_name[32];
     char result1[48];
     char result2[80];
@@ -859,7 +860,7 @@ void W13_ShowLocation(W13App *app)
                 done = 1;
             } else if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) {
                 if (inside(mx, my, 32, 84, 96, 100)) {
-                    location_run_search(app, win, loc_buf, selected_name, sizeof(selected_name), found_names, result1, sizeof(result1), result2, sizeof(result2));
+                    location_run_search(app, win, loc_buf, selected_name, sizeof(selected_name), found_names, found_labels, result1, sizeof(result1), result2, sizeof(result2));
                 } else if (inside(mx, my, 116, 84, 170, 100)) {
                     if (selected_name[0]) {
                         copy_config_text(app->config.location, sizeof(app->config.location), selected_name);
@@ -881,7 +882,7 @@ void W13_ShowLocation(W13App *app)
             } else if (cls == IDCMP_RAWKEY) {
                 UWORD raw = code & 0x7f;
                 if (raw == 0x44) {
-                    location_run_search(app, win, loc_buf, selected_name, sizeof(selected_name), found_names, result1, sizeof(result1), result2, sizeof(result2));
+                    location_run_search(app, win, loc_buf, selected_name, sizeof(selected_name), found_names, found_labels, result1, sizeof(result1), result2, sizeof(result2));
                 } else if (raw == 0x45) {
                     done = 1;
                 }
