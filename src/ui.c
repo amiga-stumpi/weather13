@@ -426,9 +426,9 @@ static void draw_temp_large(struct RastPort *rp, WORD x, WORD y, const char *s)
 }
 
 
-static struct IntuiText w13_info_text = { 1, 0, JAM1, 0, 1, 0, (UBYTE *)"Info", 0 };
-static struct IntuiText w13_quit_text = { 1, 0, JAM1, 0, 1, 0, (UBYTE *)"Quit", 0 };
-static struct IntuiText w13_location_text = { 1, 0, JAM1, 0, 1, 0, (UBYTE *)"Location...", 0 };
+static struct IntuiText w13_info_text = { 0, 1, JAM2, 2, 1, 0, (UBYTE *)"Info", 0 };
+static struct IntuiText w13_quit_text = { 0, 1, JAM2, 2, 1, 0, (UBYTE *)"Quit", 0 };
+static struct IntuiText w13_location_text = { 0, 1, JAM2, 2, 1, 0, (UBYTE *)"Location...", 0 };
 
 static struct MenuItem w13_project_items[2];
 static struct MenuItem w13_settings_items[1];
@@ -441,7 +441,7 @@ static void init_menu_item(struct MenuItem *item, struct MenuItem *next, WORD to
     item->LeftEdge = 0;
     item->TopEdge = top;
     item->Width = width;
-    item->Height = 10;
+    item->Height = 11;
     item->Flags = ITEMTEXT | ITEMENABLED | HIGHCOMP;
     item->ItemFill = (APTR)text;
 }
@@ -451,7 +451,7 @@ static void setup_menus(W13App *app)
     if (!app || !app->win)
         return;
     init_menu_item(&w13_project_items[0], &w13_project_items[1], 0, 64, &w13_info_text);
-    init_menu_item(&w13_project_items[1], 0, 10, 64, &w13_quit_text);
+    init_menu_item(&w13_project_items[1], 0, 11, 64, &w13_quit_text);
     init_menu_item(&w13_settings_items[0], 0, 0, 92, &w13_location_text);
 
     memset(w13_menus, 0, sizeof(w13_menus));
