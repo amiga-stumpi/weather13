@@ -10,6 +10,7 @@ typedef struct W13WindowConfig {
     WORD width;
     WORD height;
     WORD update_interval;
+    WORD language;
     char location[32];
 } W13WindowConfig;
 
@@ -39,5 +40,6 @@ int W13_HandleMenu(W13App *app, UWORD code);
 void W13_ShowInfo(W13App *app);
 void W13_ShowLocation(W13App *app);
 void W13_ShowUpdateInterval(W13App *app);
+void W13_ShowLanguage(W13App *app);
 
 #endif

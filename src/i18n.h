@@ -3,6 +3,12 @@
 
 #include <exec/types.h>
 
+typedef enum W13Language {
+    W13_LANG_ENGLISH = 0,
+    W13_LANG_GERMAN,
+    W13_LANG_POLISH
+} W13Language;
+
 typedef enum W13TextId {
     W13_TX_UPDATE = 0,
     W13_TX_HUMIDITY,
@@ -20,6 +26,8 @@ typedef enum W13TextId {
 } W13TextId;
 
 void W13_InitLanguage(void);
+void W13_SetLanguage(int language);
+int W13_GetLanguage(void);
 int W13_IsEnglish(void);
 const char *W13_Text(W13TextId id);
 const char *W13_ConditionText(int weather_code);

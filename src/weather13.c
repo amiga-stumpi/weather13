@@ -123,6 +123,7 @@ int main(void)
     }
     W13_InitLanguage();
     W13_LoadConfig(&app.config);
+    W13_SetLanguage(app.config.language);
     W13_FillDummyWeather(&app.data);
     copy_text(app.status, sizeof(app.status), "Demo data");
     if (W13_LoadWeatherCache(&app.data)) {

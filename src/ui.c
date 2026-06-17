@@ -23,6 +23,7 @@
 #define W13_DEFAULT_UPDATE_MINUTES 30
 #define W13_MIN_UPDATE_MINUTES 5
 #define W13_MAX_UPDATE_MINUTES 120
+#define W13_DEFAULT_LANGUAGE W13_LANG_ENGLISH
 
 static int text_len(const char *s)
 {
@@ -92,6 +93,7 @@ static void config_defaults(W13WindowConfig *cfg)
     cfg->width = W13_DEFAULT_W;
     cfg->height = W13_DEFAULT_H;
     cfg->update_interval = W13_DEFAULT_UPDATE_MINUTES;
+    cfg->language = W13_DEFAULT_LANGUAGE;
     cfg->location[0] = 'M';
     cfg->location[1] = 'u';
     cfg->location[2] = 'e';
@@ -127,6 +129,25 @@ static void config_set_text(W13WindowConfig *cfg, const char *line)
     if (key_equals(line, "LOCATION"))
         copy_config_text(cfg->location, sizeof(cfg->location), value);
 }
+
+static void config_set_language(W13WindowConfig *cfg, const char *line)
+{
+    const char *value = line;
+
+    while (*value && *value != '=')
+        ++value;
+    if (*value == '=')
+        ++value;
+    if (!key_equals(line, "LANGUAGE"))
+        return;
+    if (text_equals_ci(value, "GERMAN") || text_equals_ci(value, "DEUTSCH"))
+        cfg->language = W13_LANG_GERMAN;
+    else if (text_equals_ci(value, "POLISH") || text_equals_ci(value, "POLSKI"))
+        cfg->language = W13_LANG_POLISH;
+    else
+        cfg->language = W13_LANG_ENGLISH;
+}
+
 
 static void config_set_value(W13WindowConfig *cfg, const char *line)
 {
@@ -178,6 +199,7 @@ void W13_LoadConfig(W13WindowConfig *cfg)
             if (pos > 0 && line[0] != '#') {
                 config_set_value(cfg, line);
                 config_set_text(cfg, line);
+                config_set_language(cfg, line);
             }
             pos = 0;
         } else if (pos < (int)sizeof(line) - 1) {
@@ -189,6 +211,7 @@ void W13_LoadConfig(W13WindowConfig *cfg)
         if (line[0] != '#') {
             config_set_value(cfg, line);
             config_set_text(cfg, line);
+            config_set_language(cfg, line);
         }
     }
 
@@ -202,6 +225,8 @@ void W13_LoadConfig(W13WindowConfig *cfg)
         cfg->top = 0;
     if (cfg->update_interval < W13_MIN_UPDATE_MINUTES || cfg->update_interval > W13_MAX_UPDATE_MINUTES)
         cfg->update_interval = W13_DEFAULT_UPDATE_MINUTES;
+    if (cfg->language < W13_LANG_ENGLISH || cfg->language > W13_LANG_POLISH)
+        cfg->language = W13_DEFAULT_LANGUAGE;
 }
 
 static void config_write_num(BPTR fh, const char *key, long value)
@@ -238,6 +263,16 @@ static void config_write_num(BPTR fh, const char *key, long value)
 }
 
 
+
+static const char *config_language_name(WORD language)
+{
+    if (language == W13_LANG_GERMAN)
+        return "GERMAN";
+    if (language == W13_LANG_POLISH)
+        return "POLISH";
+    return "ENGLISH";
+}
+
 static void config_write_text(BPTR fh, const char *key, const char *value)
 {
     char line[80];
@@ -269,6 +304,7 @@ void W13_SaveConfig(const W13WindowConfig *cfg)
     config_write_num(fh, "WIDTH", cfg->width);
     config_write_num(fh, "HEIGHT", cfg->height);
     config_write_num(fh, "UPDATE_INTERVAL", cfg->update_interval);
+    config_write_text(fh, "LANGUAGE", config_language_name(cfg->language));
     config_write_text(fh, "LOCATION", cfg->location);
     Close(fh);
 }
@@ -461,9 +497,10 @@ static struct IntuiText w13_info_text = { 0, 1, JAM2, 2, 1, 0, (UBYTE *)"Info", 
 static struct IntuiText w13_quit_text = { 0, 1, JAM2, 2, 1, 0, (UBYTE *)"Quit", 0 };
 static struct IntuiText w13_location_text = { 0, 1, JAM2, 2, 1, 0, (UBYTE *)"Location...", 0 };
 static struct IntuiText w13_update_interval_text = { 0, 1, JAM2, 2, 1, 0, (UBYTE *)"Update Interval...", 0 };
+static struct IntuiText w13_language_text = { 0, 1, JAM2, 2, 1, 0, (UBYTE *)"Language...", 0 };
 
 static struct MenuItem w13_project_items[2];
-static struct MenuItem w13_settings_items[2];
+static struct MenuItem w13_settings_items[3];
 static struct Menu w13_menus[2];
 
 static void init_menu_item(struct MenuItem *item, struct MenuItem *next, WORD top, WORD width, struct IntuiText *text)
@@ -485,7 +522,8 @@ static void setup_menus(W13App *app)
     init_menu_item(&w13_project_items[0], &w13_project_items[1], 0, 64, &w13_info_text);
     init_menu_item(&w13_project_items[1], 0, 11, 64, &w13_quit_text);
     init_menu_item(&w13_settings_items[0], &w13_settings_items[1], 0, 128, &w13_location_text);
-    init_menu_item(&w13_settings_items[1], 0, 11, 128, &w13_update_interval_text);
+    init_menu_item(&w13_settings_items[1], &w13_settings_items[2], 11, 128, &w13_update_interval_text);
+    init_menu_item(&w13_settings_items[2], 0, 22, 128, &w13_language_text);
 
     memset(w13_menus, 0, sizeof(w13_menus));
     w13_menus[0].NextMenu = &w13_menus[1];
@@ -936,6 +974,90 @@ void W13_ShowUpdateInterval(W13App *app)
     CloseWindow(win);
 }
 
+void W13_ShowLanguage(W13App *app)
+{
+    struct NewWindow nw;
+    struct Window *win;
+    ULONG mask;
+    int done = 0;
+    WORD left = 30;
+    WORD top = 30;
+
+    if (!app)
+        return;
+    if (app->win) {
+        left = app->win->LeftEdge + 30;
+        top = app->win->TopEdge + 30;
+    }
+    memset(&nw, 0, sizeof(nw));
+    nw.LeftEdge = left;
+    nw.TopEdge = top;
+    nw.Width = 230;
+    nw.Height = 112;
+    nw.DetailPen = 0;
+    nw.BlockPen = 1;
+    nw.IDCMPFlags = IDCMP_CLOSEWINDOW | IDCMP_MOUSEBUTTONS | IDCMP_RAWKEY;
+    nw.Flags = WFLG_DRAGBAR | WFLG_DEPTHGADGET | WFLG_CLOSEGADGET | WFLG_SMART_REFRESH | WFLG_ACTIVATE;
+    nw.Title = (UBYTE *)"Language";
+    nw.Type = WBENCHSCREEN;
+    win = OpenWindow(&nw);
+    if (!win)
+        return;
+    SetDrMd(win->RPort, JAM1);
+    SetBPen(win->RPort, 0);
+    SetAPen(win->RPort, 0);
+    RectFill(win->RPort, 2, 10, win->Width - 3, win->Height - 3);
+    SetAPen(win->RPort, 1);
+    draw_text(win->RPort, 12, 28, "Select language:");
+    draw_button(win->RPort, 34, 38, 126, 54, "English");
+    draw_button(win->RPort, 34, 60, 126, 76, "Deutsch");
+    draw_button(win->RPort, 34, 82, 126, 98, "Polski");
+    if (app->config.language == W13_LANG_ENGLISH)
+        draw_text(win->RPort, 144, 50, "current");
+    else if (app->config.language == W13_LANG_GERMAN)
+        draw_text(win->RPort, 144, 72, "current");
+    else if (app->config.language == W13_LANG_POLISH)
+        draw_text(win->RPort, 144, 94, "current");
+    mask = 1UL << win->UserPort->mp_SigBit;
+    while (!done) {
+        struct IntuiMessage *msg;
+        Wait(mask);
+        while ((msg = (struct IntuiMessage *)GetMsg(win->UserPort)) != 0) {
+            ULONG cls = msg->Class;
+            WORD mx = msg->MouseX;
+            WORD my = msg->MouseY;
+            UWORD code = msg->Code;
+            ReplyMsg((struct Message *)msg);
+            if (cls == IDCMP_CLOSEWINDOW) {
+                done = 1;
+            } else if (cls == IDCMP_MOUSEBUTTONS && code == SELECTDOWN) {
+                if (inside(mx, my, 34, 38, 126, 54)) {
+                    app->config.language = W13_LANG_ENGLISH;
+                    W13_SetLanguage(app->config.language);
+                    W13_SetStatus(app, "Language changed");
+                    done = 1;
+                } else if (inside(mx, my, 34, 60, 126, 76)) {
+                    app->config.language = W13_LANG_GERMAN;
+                    W13_SetLanguage(app->config.language);
+                    W13_SetStatus(app, "Sprache geaendert");
+                    done = 1;
+                } else if (inside(mx, my, 34, 82, 126, 98)) {
+                    app->config.language = W13_LANG_POLISH;
+                    W13_SetLanguage(app->config.language);
+                    W13_SetStatus(app, "Jezyk zmieniony");
+                    done = 1;
+                }
+            } else if (cls == IDCMP_RAWKEY && ((code & 0x7f) == 0x45)) {
+                done = 1;
+            }
+        }
+    }
+    CloseWindow(win);
+    if (app->win)
+        W13_DrawAll(app);
+}
+
+
 int W13_HandleMenu(W13App *app, UWORD code)
 {
     UWORD menu = MENUNUM(code);
@@ -951,6 +1073,8 @@ int W13_HandleMenu(W13App *app, UWORD code)
         W13_ShowLocation(app);
     } else if (menu == 1 && item == 1) {
         W13_ShowUpdateInterval(app);
+    } else if (menu == 1 && item == 2) {
+        W13_ShowLanguage(app);
     }
     return 0;
 }
