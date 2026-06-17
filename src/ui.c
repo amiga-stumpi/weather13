@@ -813,23 +813,37 @@ void W13_ShowLocation(W13App *app)
                         if (count <= 0) {
                             draw_location_result(win, W13_Text(W13_TX_MSG_LOCATION_NOT_FOUND), 0);
                             W13_SetStatus(app, app->status[0] ? app->status : W13_Text(W13_TX_MSG_SEARCH_FAILED));
-                        } else if (text_equals_ci(loc_buf, found_names[0])) {
-                            result1[0] = 0;
-                            cat_text(result1, sizeof(result1), W13_Text(W13_TX_MSG_FOUND_PREFIX));
-                            cat_text(result1, sizeof(result1), found_names[0]);
-                            draw_location_result(win, result1, 0);
-                            copy_config_text(app->config.location, sizeof(app->config.location), found_names[0]);
-                            W13_FetchWeatherForLocation(found_names[0], &app->data, app->status, sizeof(app->status));
-                            W13_SetStatus(app, app->status[0] ? app->status : W13_Text(W13_TX_MSG_SEARCH_DONE));
                         } else {
-                            result2[0] = 0;
-                            cat_text(result2, sizeof(result2), found_names[0]);
-                            if (count > 1) {
-                                cat_text(result2, sizeof(result2), ", ");
-                                cat_text(result2, sizeof(result2), found_names[1]);
+                            int match = -1;
+                            int i;
+                            for (i = 0; i < count; ++i) {
+                                if (text_equals_ci(loc_buf, found_names[i])) {
+                                    match = i;
+                                    break;
+                                }
                             }
-                            draw_location_result(win, W13_Text(W13_TX_MSG_LOCATION_TRY), result2);
-                            W13_SetStatus(app, W13_Text(W13_TX_MSG_SIMILAR_LOCATIONS));
+                            if (match >= 0) {
+                                result1[0] = 0;
+                                cat_text(result1, sizeof(result1), W13_Text(W13_TX_MSG_FOUND_PREFIX));
+                                cat_text(result1, sizeof(result1), found_names[match]);
+                                draw_location_result(win, result1, 0);
+                                copy_config_text(app->config.location, sizeof(app->config.location), found_names[match]);
+                                W13_FetchWeatherForLocation(found_names[match], &app->data, app->status, sizeof(app->status));
+                                W13_SetStatus(app, app->status[0] ? app->status : W13_Text(W13_TX_MSG_SEARCH_DONE));
+                            } else {
+                                int shown = 0;
+                                result2[0] = 0;
+                                for (i = 0; i < count && shown < 2; ++i) {
+                                    if (text_equals_ci(loc_buf, found_names[i]))
+                                        continue;
+                                    if (shown > 0)
+                                        cat_text(result2, sizeof(result2), ", ");
+                                    cat_text(result2, sizeof(result2), found_names[i]);
+                                    ++shown;
+                                }
+                                draw_location_result(win, W13_Text(W13_TX_MSG_LOCATION_TRY), result2);
+                                W13_SetStatus(app, W13_Text(W13_TX_MSG_SIMILAR_LOCATIONS));
+                            }
                         }
                     }
                 } else if (inside(mx, my, 116, 84, 170, 100)) {

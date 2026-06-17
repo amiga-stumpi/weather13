@@ -440,6 +440,18 @@ static int text_equals_ci(const char *a, const char *b)
     return a[i] == 0 && b[i] == 0;
 }
 
+
+static int hex_value(char c)
+{
+    if (c >= '0' && c <= '9')
+        return c - '0';
+    if (c >= 'a' && c <= 'f')
+        return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F')
+        return c - 'A' + 10;
+    return -1;
+}
+
 static void append_latin1_char(char *dst, int dst_size, UBYTE c)
 {
     if (c == 0xe4) append_text(dst, dst_size, "ae");
@@ -460,6 +472,8 @@ static void append_utf8_json_char(char *dst, int dst_size, char **pp)
         append_latin1_char(dst, dst_size, (UBYTE)**pp);
     } else if (c < 128) {
         append_char(dst, dst_size, (char)c);
+    } else {
+        append_latin1_char(dst, dst_size, c);
     }
 }
 
@@ -481,7 +495,18 @@ static char *json_string_field(char *start, const char *field, char *dst, int ds
     while (*p && *p != '"') {
         if (*p == '\\' && p[1]) {
             ++p;
-            if (*p == 'n' || *p == 'r' || *p == 't') {
+            if (*p == 'u' && p[1] && p[2] && p[3] && p[4]) {
+                int h1 = hex_value(p[1]);
+                int h2 = hex_value(p[2]);
+                int h3 = hex_value(p[3]);
+                int h4 = hex_value(p[4]);
+                if (h1 >= 0 && h2 >= 0 && h3 >= 0 && h4 >= 0) {
+                    UWORD code = (UWORD)((h1 << 12) | (h2 << 8) | (h3 << 4) | h4);
+                    if (code <= 255)
+                        append_latin1_char(dst, dst_size, (UBYTE)code);
+                    p += 4;
+                }
+            } else if (*p == 'n' || *p == 'r' || *p == 't') {
                 ;
             } else {
                 append_char(dst, dst_size, *p);
