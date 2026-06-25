@@ -22,7 +22,7 @@ static const char *de_texts[W13_TX_COUNT] = {
     "Ende",
     "Ort...",
     "Update-Intervall...",
-    "Sprache...",
+    "Sprachen",
     "Info",
     "Ort",
     "Update-Intervall",
@@ -67,7 +67,7 @@ static const char *en_texts[W13_TX_COUNT] = {
     "Quit",
     "Location...",
     "Update Interval...",
-    "Language...",
+    "Languages",
     "Info",
     "Location",
     "Update Interval",
@@ -112,7 +112,7 @@ static const char *pl_texts[W13_TX_COUNT] = {
     "Koniec",
     "Miasto...",
     "Interwal...",
-    "Jezyk...",
+    "Jezyki",
     "Info",
     "Miasto",
     "Interwal",
@@ -171,6 +171,62 @@ static const char *pl_conditions[W13_WEATHER_COUNT] = {
     "Nieznane"
 };
 
+static const char *gr_texts[W13_TX_COUNT] = {
+    "Enimerosi",
+    "Ygrasia",
+    "Piesi",
+    "Imera",
+    "Nychta",
+    "Vrochi",
+    "Anemos",
+    "Exodos",
+    "Demo dedomena",
+    "Simera",
+    "Avrio",
+    "Methavrio",
+    "Ergo",
+    "Rythmiseis",
+    "Info",
+    "Exodos",
+    "Topothesia...",
+    "Diastima enimerosis...",
+    "Glosses",
+    "Info",
+    "Topothesia",
+    "Diastima enimerosis",
+    "Glossa",
+    "Topothesia:",
+    "Lepta:",
+    "Anazitisi",
+    "Orismos",
+    "Akyro",
+    "OK",
+    "Dose topothesia kai pata Anazitisi",
+    "Den vrethike topothesia",
+    "Vrethike: ",
+    "Den vrethike. Dokimase:",
+    "Anazitisi...",
+    "Apotychia anazitisis",
+    "Anazitisi oloklirothike",
+    "Vrethikan paromoies topothesies",
+    "Egkyro: 5..120 lepta",
+    "To diastima allaxe",
+    "Epilexe glossa:",
+    "energi",
+    "I glossa allaxe"
+};
+
+static const char *gr_conditions[W13_WEATHER_COUNT] = {
+    "Ilios",
+    "Ligi synnefia",
+    "Synnefia",
+    "Vrochi",
+    "Kataigida",
+    "Omichli",
+    "Chioni",
+    "Agnosto"
+};
+
 void W13_InitLanguage(void)
 {
     g_language = W13_LANG_ENGLISH;
@@ -178,7 +234,7 @@ void W13_InitLanguage(void)
 
 void W13_SetLanguage(int language)
 {
-    if (language < W13_LANG_ENGLISH || language > W13_LANG_POLISH)
+    if (language < W13_LANG_ENGLISH || language > W13_LANG_GREEK)
         language = W13_LANG_ENGLISH;
     g_language = language;
 }
@@ -201,6 +257,8 @@ const char *W13_Text(W13TextId id)
         return de_texts[id];
     if (g_language == W13_LANG_POLISH)
         return pl_texts[id];
+    if (g_language == W13_LANG_GREEK)
+        return gr_texts[id];
     return en_texts[id];
 }
 
@@ -212,5 +270,7 @@ const char *W13_ConditionText(int weather_code)
         return de_conditions[weather_code];
     if (g_language == W13_LANG_POLISH)
         return pl_conditions[weather_code];
+    if (g_language == W13_LANG_GREEK)
+        return gr_conditions[weather_code];
     return en_conditions[weather_code];
 }

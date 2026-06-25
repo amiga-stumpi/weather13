@@ -2,6 +2,10 @@
 #include "windrose.h"
 #include "i18n.h"
 #include "weather_net.h"
+#define W13_MENU_SUB_ENGLISH 0
+#define W13_MENU_SUB_GERMAN 1
+#define W13_MENU_SUB_POLISH 2
+#define W13_MENU_SUB_GREEK 3
 #include <exec/types.h>
 #include <graphics/gfx.h>
 #include <graphics/rastport.h>
@@ -12,7 +16,7 @@
 #include <proto/graphics.h>
 #include <proto/intuition.h>
 
-#define W13_VERSION "v1.1"
+#define W13_VERSION "v1.2"
 
 #define W13_MIN_W 320
 #define W13_MIN_H 178
@@ -144,6 +148,8 @@ static void config_set_language(W13WindowConfig *cfg, const char *line)
         cfg->language = W13_LANG_GERMAN;
     else if (text_equals_ci(value, "POLISH") || text_equals_ci(value, "POLSKI"))
         cfg->language = W13_LANG_POLISH;
+    else if (text_equals_ci(value, "GREEK") || text_equals_ci(value, "ELLINIKA"))
+        cfg->language = W13_LANG_GREEK;
     else
         cfg->language = W13_LANG_ENGLISH;
 }
@@ -225,7 +231,7 @@ void W13_LoadConfig(W13WindowConfig *cfg)
         cfg->top = 0;
     if (cfg->update_interval < W13_MIN_UPDATE_MINUTES || cfg->update_interval > W13_MAX_UPDATE_MINUTES)
         cfg->update_interval = W13_DEFAULT_UPDATE_MINUTES;
-    if (cfg->language < W13_LANG_ENGLISH || cfg->language > W13_LANG_POLISH)
+    if (cfg->language < W13_LANG_ENGLISH || cfg->language > W13_LANG_GREEK)
         cfg->language = W13_DEFAULT_LANGUAGE;
 }
 
@@ -270,6 +276,8 @@ static const char *config_language_name(WORD language)
         return "GERMAN";
     if (language == W13_LANG_POLISH)
         return "POLISH";
+    if (language == W13_LANG_GREEK)
+        return "GREEK";
     return "ENGLISH";
 }
 
@@ -499,9 +507,14 @@ static struct IntuiText w13_quit_text = { 0, 1, JAM2, 2, 1, 0, 0, 0 };
 static struct IntuiText w13_location_text = { 0, 1, JAM2, 2, 1, 0, 0, 0 };
 static struct IntuiText w13_update_interval_text = { 0, 1, JAM2, 2, 1, 0, 0, 0 };
 static struct IntuiText w13_language_text = { 0, 1, JAM2, 2, 1, 0, 0, 0 };
+static struct IntuiText w13_lang_en_text = { 0, 1, JAM2, 2, 1, 0, (UBYTE *)"English", 0 };
+static struct IntuiText w13_lang_de_text = { 0, 1, JAM2, 2, 1, 0, (UBYTE *)"Deutsch", 0 };
+static struct IntuiText w13_lang_pl_text = { 0, 1, JAM2, 2, 1, 0, (UBYTE *)"Polski", 0 };
+static struct IntuiText w13_lang_gr_text = { 0, 1, JAM2, 2, 1, 0, (UBYTE *)"Ellinika", 0 };
 
 static struct MenuItem w13_project_items[2];
 static struct MenuItem w13_settings_items[3];
+static struct MenuItem w13_language_subitems[4];
 static struct Menu w13_menus[2];
 
 static void init_menu_item(struct MenuItem *item, struct MenuItem *next, WORD top, WORD width, struct IntuiText *text)
@@ -530,6 +543,15 @@ static void setup_menus(W13App *app)
     init_menu_item(&w13_settings_items[0], &w13_settings_items[1], 0, 152, &w13_location_text);
     init_menu_item(&w13_settings_items[1], &w13_settings_items[2], 11, 152, &w13_update_interval_text);
     init_menu_item(&w13_settings_items[2], 0, 22, 152, &w13_language_text);
+    init_menu_item(&w13_language_subitems[0], &w13_language_subitems[1], 0, 82, &w13_lang_en_text);
+    init_menu_item(&w13_language_subitems[1], &w13_language_subitems[2], 11, 82, &w13_lang_de_text);
+    init_menu_item(&w13_language_subitems[2], &w13_language_subitems[3], 22, 82, &w13_lang_pl_text);
+    init_menu_item(&w13_language_subitems[3], 0, 33, 82, &w13_lang_gr_text);
+    w13_language_subitems[0].LeftEdge = 150;
+    w13_language_subitems[1].LeftEdge = 150;
+    w13_language_subitems[2].LeftEdge = 150;
+    w13_language_subitems[3].LeftEdge = 150;
+    w13_settings_items[2].SubItem = &w13_language_subitems[0];
 
     memset(w13_menus, 0, sizeof(w13_menus));
     w13_menus[0].NextMenu = &w13_menus[1];
@@ -1106,6 +1128,28 @@ void W13_ShowLanguage(W13App *app)
 }
 
 
+static void set_language_from_menu(W13App *app, UWORD sub)
+{
+    if (!app)
+        return;
+    if (sub == W13_MENU_SUB_ENGLISH)
+        app->config.language = W13_LANG_ENGLISH;
+    else if (sub == W13_MENU_SUB_GERMAN)
+        app->config.language = W13_LANG_GERMAN;
+    else if (sub == W13_MENU_SUB_POLISH)
+        app->config.language = W13_LANG_POLISH;
+    else if (sub == W13_MENU_SUB_GREEK)
+        app->config.language = W13_LANG_GREEK;
+    else
+        return;
+    W13_SetLanguage(app->config.language);
+    if (app->win) {
+        ClearMenuStrip(app->win);
+        setup_menus(app);
+    }
+    W13_SetStatus(app, W13_Text(W13_TX_MSG_LANGUAGE_CHANGED));
+}
+
 int W13_HandleMenu(W13App *app, UWORD code)
 {
     UWORD menu = MENUNUM(code);
@@ -1122,7 +1166,7 @@ int W13_HandleMenu(W13App *app, UWORD code)
     } else if (menu == 1 && item == 1) {
         W13_ShowUpdateInterval(app);
     } else if (menu == 1 && item == 2) {
-        W13_ShowLanguage(app);
+        set_language_from_menu(app, SUBNUM(code));
     }
     return 0;
 }

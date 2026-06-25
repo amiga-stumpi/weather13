@@ -6,7 +6,8 @@
 typedef enum W13Language {
     W13_LANG_ENGLISH = 0,
     W13_LANG_GERMAN,
-    W13_LANG_POLISH
+    W13_LANG_POLISH,
+    W13_LANG_GREEK
 } W13Language;
 
 typedef enum W13TextId {
