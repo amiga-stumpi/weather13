@@ -10,6 +10,7 @@
 #define W13_GEO_HOST "geocoding-api.open-meteo.com"
 #define W13_API_HOST "api.open-meteo.com"
 #define W13_HTTP_PORT 80
+#define W13_SEND_RETRIES 15
 
 static struct Library *g_sock_base;
 static struct Amitcp13BsdFdSet g_rfds;
@@ -269,6 +270,41 @@ static int wait_fd(int fd, int write, LONG sec)
     return call_waitselect(g_sock_base, fd + 1, write ? 0 : &g_rfds, write ? &g_wfds : 0, &g_tv);
 }
 
+static int send_all(int fd, const char *buf, int len)
+{
+    int done;
+    int retries;
+
+    done = 0;
+    retries = 0;
+    while (done < len) {
+        int r;
+        int err;
+
+        r = call_send(g_sock_base, fd, buf + done, len - done);
+        if (r > 0) {
+            done += r;
+            retries = 0;
+            continue;
+        }
+        if (r == 0)
+            return 0;
+
+        err = call_errno(g_sock_base);
+        if (err != AMITCP13_EWOULDBLOCK && err != AMITCP13_EAGAIN &&
+            err != AMITCP13_EINPROGRESS && err != AMITCP13_EALREADY)
+            return 0;
+
+        ++retries;
+        if (retries > W13_SEND_RETRIES)
+            return 0;
+        r = wait_fd(fd, 1, 1);
+        if (r < 0)
+            return 0;
+    }
+    return 1;
+}
+
 static int connect_host(const char *host)
 {
     struct hostent *he;
@@ -323,7 +359,7 @@ static void build_request(char *req, int req_size, const char *host, const char 
     append_text(req, req_size, path);
     append_text(req, req_size, " HTTP/1.0\r\nHost: ");
     append_text(req, req_size, host);
-    append_text(req, req_size, "\r\nUser-Agent: Weather13/1.2 (AmigaOS 1.3)\r\nConnection: close\r\n\r\n");
+    append_text(req, req_size, "\r\nUser-Agent: Weather13/1.3 (AmigaOS 1.3)\r\nConnection: close\r\n\r\n");
 }
 
 static int http_fetch(const char *host, const char *path, char *status, int status_size)
@@ -340,8 +376,7 @@ static int http_fetch(const char *host, const char *path, char *status, int stat
         return fd;
     }
     build_request(req, sizeof(req), host, path);
-    r = call_send(g_sock_base, fd, req, text_len(req));
-    if (r < 0) {
+    if (!send_all(fd, req, text_len(req))) {
         call_close_socket(g_sock_base, fd);
         set_status(status, status_size, "HTTP send failed");
         return -7;

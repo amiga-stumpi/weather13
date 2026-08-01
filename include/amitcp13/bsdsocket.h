@@ -24,7 +24,7 @@
 #define AMITCP13_EINTR        4
 #define AMITCP13_EIO          5
 #define AMITCP13_EBADF        9
-#define AMITCP13_EAGAIN       11
+#define AMITCP13_EAGAIN       35
 #define AMITCP13_EWOULDBLOCK  AMITCP13_EAGAIN
 #define AMITCP13_ENOMEM       12
 #define AMITCP13_EACCES       13

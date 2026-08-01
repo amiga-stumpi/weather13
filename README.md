@@ -2,6 +2,14 @@
 
 Weather13 is an AmigaOS/Kickstart 1.3 Workbench weather station prototype.
 
+## Version 1.3
+
+- Improved HTTP reliability with complete handling of partial socket writes.
+- Added bounded retries for temporarily unavailable non-blocking sockets.
+- Updated the bundled bsdsocket errno definitions to match TheWire13.
+- Fixed weather updates failing when `send()` returns `EWOULDBLOCK` (errno 35).
+- Updated the displayed version and HTTP User-Agent to Weather13 1.3.
+
 Current status:
 
 - Opens a normal Workbench window, not a custom screen.
